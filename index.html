@@ -1,0 +1,2257 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SupiriPOS PRO | Commercial Multi-Tenant Cloud POS Platform</title>
+  <meta name="description"
+    content="SupiriPOS PRO - Sri Lanka's Leading Commercial Multi-Tenant Cloud Point of Sale System. Real-Time Multi-Device Sync, Offline Resilience, Supabase Cloud PostgreSQL, Thermal Receipt Printing. Powered by PrasaTek System Solutions.">
+  <meta name="keywords"
+    content="POS Sri Lanka, SupiriPOS, PrasaTek, Cloud POS, Supermarket POS, Sinhala POS, Hardware POS, Thermal Printing 80mm">
+  <meta name="author" content="PrasaTek System Solutions">
+  <link rel="canonical" href="https://pos.prasatek.lk">
+
+  <!-- Open Graph / Meta -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://pos.prasatek.lk">
+  <meta property="og:title" content="SupiriPOS PRO | Commercial Multi-Tenant Cloud POS">
+  <meta property="og:description"
+    content="Real-Time Multi-Device Sync, Supabase Cloud PostgreSQL, Sri Lankan Retail & Hardware Point of Sale.">
+  <meta property="og:image" content="/assets/logo.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Noto+Sans+Sinhala:wght@400;600;700&display=swap"
+    rel="stylesheet">
+
+  <!-- Core Glassmorphism Design System CSS -->
+  <style>
+    :root {
+      --bg-dark: #0b1120;
+      --bg-card: rgba(15, 23, 42, 0.75);
+      --bg-card-hover: rgba(30, 41, 59, 0.85);
+      --border-glass: rgba(255, 255, 255, 0.08);
+      --border-accent: rgba(16, 185, 129, 0.3);
+      --border-cyan: rgba(6, 182, 212, 0.3);
+
+      --emerald: #10b981;
+      --emerald-dark: #059669;
+      --emerald-glow: rgba(16, 185, 129, 0.35);
+
+      --cyan: #06b6d4;
+      --cyan-dark: #0891b2;
+      --cyan-glow: rgba(6, 182, 212, 0.35);
+
+      --danger: #ef4444;
+      --danger-glow: rgba(239, 68, 68, 0.35);
+
+      --warning: #f59e0b;
+      --warning-glow: rgba(245, 158, 11, 0.35);
+
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+
+      --font-main: 'Plus Jakarta Sans', 'Noto Sans Sinhala', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    input,
+    textarea,
+    select {
+      user-select: text;
+      -webkit-user-select: text;
+    }
+
+    body {
+      font-family: var(--font-main);
+      background-color: var(--bg-dark);
+      background-image:
+        radial-gradient(at 0% 0%, rgba(6, 182, 212, 0.12) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.12) 0px, transparent 50%),
+        radial-gradient(at 50% 100%, rgba(11, 17, 32, 0.95) 0px, transparent 70%);
+      background-attachment: fixed;
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(11, 17, 32, 0.6);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--emerald);
+    }
+
+    /* Glass Panels */
+    .glass-panel {
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-glass);
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .glass-panel-interactive:hover {
+      border-color: var(--cyan);
+      box-shadow: 0 12px 35px var(--cyan-glow);
+      transform: translateY(-2px);
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-family: var(--font-main);
+      font-weight: 600;
+      font-size: 14px;
+      padding: 10px 18px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    .btn-emerald {
+      background: linear-gradient(135deg, var(--emerald) 0%, var(--emerald-dark) 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 15px var(--emerald-glow);
+    }
+
+    .btn-emerald:hover {
+      background: linear-gradient(135deg, #1bd295 0%, var(--emerald) 100%);
+      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
+    }
+
+    .btn-cyan {
+      background: linear-gradient(135deg, var(--cyan) 0%, var(--cyan-dark) 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 15px var(--cyan-glow);
+    }
+
+    .btn-cyan:hover {
+      background: linear-gradient(135deg, #22d3ee 0%, var(--cyan) 100%);
+      box-shadow: 0 6px 20px rgba(6, 182, 212, 0.5);
+    }
+
+    .btn-glass {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-glass);
+      color: var(--text-main);
+    }
+
+    .btn-glass:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-danger {
+      background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 15px var(--danger-glow);
+    }
+
+    .btn-danger:hover {
+      box-shadow: 0 6px 20px rgba(239, 68, 68, 0.5);
+    }
+
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 12px;
+      border-radius: 8px;
+    }
+
+    .btn-lg {
+      padding: 14px 26px;
+      font-size: 16px;
+      border-radius: 12px;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border-glass);
+    }
+
+    .badge-emerald {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: var(--emerald);
+    }
+
+    .badge-cyan {
+      background: rgba(6, 182, 212, 0.15);
+      border-color: rgba(6, 182, 212, 0.4);
+      color: var(--cyan);
+    }
+
+    .badge-warning {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: rgba(245, 158, 11, 0.4);
+      color: var(--warning);
+    }
+
+    .badge-danger {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: var(--danger);
+    }
+
+    /* Pulsing Sync Dot */
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--emerald);
+      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+      animation: pulse-ring 1.8s infinite;
+    }
+
+    @keyframes pulse-ring {
+      0% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+      }
+
+      70% {
+        box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+      }
+
+      100% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+      }
+    }
+
+    /* Forms & Inputs */
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 16px;
+      text-align: left;
+    }
+
+    .form-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .form-control {
+      background: rgba(11, 17, 32, 0.8);
+      border: 1px solid var(--border-glass);
+      color: var(--text-main);
+      font-family: var(--font-main);
+      font-size: 14px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .form-control:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.2);
+    }
+
+    .form-control::placeholder {
+      color: var(--text-dim);
+    }
+
+    /* Modals */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(11, 17, 32, 0.85);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.25s ease;
+    }
+
+    .modal-backdrop.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal-card {
+      width: 100%;
+      max-width: 580px;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 28px;
+      transform: scale(0.95);
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .modal-backdrop.active .modal-card {
+      transform: scale(1);
+    }
+
+    /* Toast Notification */
+    #toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .toast-msg {
+      pointer-events: auto;
+      min-width: 300px;
+      max-width: 420px;
+      padding: 14px 18px;
+      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-glass);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--text-main);
+      font-size: 13px;
+      font-weight: 500;
+      animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .toast-msg.toast-success {
+      border-color: var(--emerald);
+    }
+
+    .toast-msg.toast-info {
+      border-color: var(--cyan);
+    }
+
+    .toast-msg.toast-warning {
+      border-color: var(--warning);
+    }
+
+    .toast-msg.toast-error {
+      border-color: var(--danger);
+    }
+
+    @keyframes slideInRight {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    /* Strict Tab Isolation & 100% Responsive Display Fit */
+    html, body {
+      width: 100%;
+      max-width: 100vw;
+      overflow-x: hidden;
+    }
+
+    .pos-tab-section {
+      display: none !important;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+
+    .pos-tab-section.active-tab-flex {
+      display: flex !important;
+      flex-direction: column;
+    }
+
+    .pos-tab-section.active-tab-grid {
+      display: grid !important;
+    }
+
+    .reports-subtab-section {
+      display: none !important;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+
+    .reports-subtab-section.active-subtab {
+      display: flex !important;
+      flex-direction: column;
+    }
+
+    #pos-nav-tabs {
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    #pos-nav-tabs::-webkit-scrollbar {
+      display: none;
+    }
+
+    #pos-nav-tabs .btn {
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 8px;
+      white-space: nowrap;
+    }
+
+    /* Hide role title & live clock below 1536px (2xl) so navbar never overflows at 100% zoom */
+    .hide-below-2xl {
+      display: none !important;
+    }
+
+    @media (min-width: 1536px) {
+      .hide-below-2xl {
+        display: inline-block !important;
+      }
+    }
+
+    /* 6 KPI Cards in 1 clean row on laptops at 100% zoom */
+    .dash-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+      width: 100%;
+    }
+
+    .dash-feeds-grid {
+      display: grid;
+      grid-template-columns: 7fr 5fr;
+      gap: 14px;
+      align-items: start;
+      width: 100%;
+    }
+
+    @media (max-width: 1180px) {
+      .dash-kpi-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    /* Responsive adjustments for smaller laptops / tablets (<= 1024px) */
+    @media (max-width: 1024px) {
+      #view-workspace>header {
+        height: auto !important;
+        max-height: none !important;
+        padding: 6px 12px !important;
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+      }
+
+      #pos-nav-tabs {
+        order: 3;
+        width: 100%;
+        justify-content: space-between;
+        overflow-x: auto;
+      }
+
+      #view-workspace>main {
+        height: calc(100vh - 96px) !important;
+      }
+
+      #tab-billing {
+        grid-template-columns: minmax(0, 1fr) 360px !important;
+        height: calc(100vh - 116px) !important;
+        max-height: calc(100vh - 116px) !important;
+      }
+    }
+
+    /* Responsive adjustments for tablets / mobile (<= 900px) */
+    @media (max-width: 900px) {
+      .dash-feeds-grid {
+        grid-template-columns: 1fr !important;
+      }
+
+      #tab-billing {
+        grid-template-columns: 1fr !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+      }
+
+      #tab-billing>div {
+        height: 540px !important;
+      }
+
+      #form-stock-adjust {
+        grid-template-columns: 1fr 1fr !important;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .dash-kpi-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    /* Thermal Receipt Styles */
+    #printable-receipt-container {
+      display: none;
+    }
+
+    @media print {
+      body * {
+        visibility: hidden !important;
+      }
+
+      #printable-receipt-container,
+      #printable-receipt-container * {
+        visibility: visible !important;
+      }
+
+      #printable-receipt-container {
+        display: block !important;
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        font-family: 'Courier New', Courier, monospace !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+
+      @page {
+        margin: 0;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container"></div>
+
+  <!-- ========================================================================= -->
+  <!-- VIEW 1: COMMERCIAL LANDING PAGE (pos.prasatek.lk)                          -->
+  <!-- ========================================================================= -->
+  <div id="view-landing" style="display: flex; flex-direction: column; min-height: 100vh;">
+    <!-- Landing Navbar -->
+    <header
+      style="padding: 18px 32px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-glass); background: rgba(11, 17, 32, 0.7); backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 100;">
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <img src="/assets/logo.png" alt="SupiriPOS PRO"
+          style="height: 44px; filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.3));"
+          onerror="this.style.display='none'">
+        <div>
+          <div
+            style="font-size: 20px; font-weight: 800; letter-spacing: -0.5px; background: linear-gradient(90deg, #10b981, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+            SupiriPOS PRO
+          </div>
+          <div style="font-size: 11px; color: var(--text-dim); font-weight: 600; letter-spacing: 0.5px;">
+            POWERED BY PRASATEK SYSTEM SOLUTIONS
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <div id="db-connection-pill" class="badge badge-emerald">
+          <span class="pulse-dot"></span>
+          <span id="db-status-text">Cloud Engine Active</span>
+        </div>
+        <button class="btn btn-glass btn-sm" onclick="openUserGuideModal()">
+          <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+            <path
+              d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 16h-2v-2h2v2zm1.07-7.75l-.9.92C12.45 11.9 12 12.5 12 14h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H7c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.04-.42 1.99-1.07 2.75z" />
+          </svg>
+          User Guide (සිංහල / EN)
+        </button>
+        <button class="btn btn-cyan btn-sm" onclick="openUnlockBizModal()">
+          <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+            <path
+              d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" />
+          </svg>
+          Terminal Login
+        </button>
+      </div>
+    </header>
+
+    <!-- Landing Hero -->
+    <main style="flex: 1; max-width: 1240px; margin: 0 auto; width: 100%; padding: 40px 24px;">
+      <div style="text-align: center; margin-bottom: 50px;">
+        <div style="display: inline-flex; align-items: center; gap: 8px; margin-bottom: 16px;" class="badge badge-cyan">
+          <span>✨ COMMERCIAL-GRADE MULTI-TENANT POS</span>
+          <span style="opacity: 0.5;">•</span>
+          <span>HOSTED AT POS.PRASATEK.LK</span>
+        </div>
+        <h1 style="font-size: 44px; font-weight: 800; line-height: 1.2; margin-bottom: 16px; letter-spacing: -1px;">
+          Next-Generation Cloud Point of Sale <br>
+          <span
+            style="background: linear-gradient(90deg, #10b981, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+            Fast, Resilient & Built for Sri Lankan Retail
+          </span>
+        </h1>
+        <p
+          style="color: var(--text-muted); font-size: 16px; max-width: 760px; margin: 0 auto 30px auto; line-height: 1.6;">
+          Real-time multi-device synchronization across counters, Supabase PostgreSQL cloud sync with offline SQLite
+          resilience, thermal receipt printing (80mm & 58mm), and granular role-based staff permissions.
+        </p>
+
+        <!-- 3 Prominent Action Gateways -->
+        <div
+          style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; margin-top: 20px; text-align: left;">
+
+          <!-- Gateway 1: Instant Demo Supermarket -->
+          <div class="glass-panel glass-panel-interactive"
+            style="padding: 30px; display: flex; flex-direction: column; justify-content: space-between; border-color: rgba(16, 185, 129, 0.4); background: linear-gradient(180deg, rgba(16, 185, 129, 0.08) 0%, rgba(15, 23, 42, 0.8) 100%);">
+            <div>
+              <div
+                style="width: 52px; height: 52px; border-radius: 14px; background: rgba(16, 185, 129, 0.2); display: flex; align-items: center; justify-content: center; margin-bottom: 20px; color: var(--emerald);">
+                <svg width="28" height="28" fill="currentColor" viewBox="0 0 24 24">
+                  <path
+                    d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4-3c-.83 0-1.5-.67-1.5-1.5S18.67 9 19.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
+                </svg>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <h3 style="font-size: 20px; font-weight: 700; color: #ffffff;">1-Click Live Demo</h3>
+                <span class="badge badge-emerald">PT-DEMO</span>
+              </div>
+              <p style="color: var(--text-muted); font-size: 14px; line-height: 1.5; margin-bottom: 24px;">
+                Instantly launch our pre-populated Colombo Supermarket demo. Test fast cashier billing, barcode
+                scanning, thermal printing, and live sales reports without registering!
+              </p>
+            </div>
+            <button class="btn btn-emerald btn-lg" style="width: 100%;" onclick="launchInstantDemo()">
+              <span>🚀 Launch Instant Demo Shop</span>
+            </button>
+          </div>
+
+          <!-- Gateway 2: Business Registration Wizard -->
+          <div class="glass-panel glass-panel-interactive"
+            style="padding: 30px; display: flex; flex-direction: column; justify-content: space-between; border-color: rgba(6, 182, 212, 0.4); background: linear-gradient(180deg, rgba(6, 182, 212, 0.08) 0%, rgba(15, 23, 42, 0.8) 100%);">
+            <div>
+              <div
+                style="width: 52px; height: 52px; border-radius: 14px; background: rgba(6, 182, 212, 0.2); display: flex; align-items: center; justify-content: center; margin-bottom: 20px; color: var(--cyan);">
+                <svg width="28" height="28" fill="currentColor" viewBox="0 0 24 24">
+                  <path
+                    d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z" />
+                </svg>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <h3 style="font-size: 20px; font-weight: 700; color: #ffffff;">Register Business</h3>
+                <span class="badge badge-cyan">FREE SETUP</span>
+              </div>
+              <p style="color: var(--text-muted); font-size: 14px; line-height: 1.5; margin-bottom: 24px;">
+                Create your isolated business account in 4 simple steps. Get a unique sequential Business Code (<strong
+                  style="color:var(--cyan)">PT-00001</strong>), upload your bill logo, and download your credentials
+                card.
+              </p>
+            </div>
+            <button class="btn btn-cyan btn-lg" style="width: 100%;" onclick="openRegistrationModal()">
+              <span>✨ Create Free POS Account</span>
+            </button>
+          </div>
+
+          <!-- Gateway 3: Business Terminal Login -->
+          <div class="glass-panel glass-panel-interactive"
+            style="padding: 30px; display: flex; flex-direction: column; justify-content: space-between; background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(15, 23, 42, 0.8) 100%);">
+            <div>
+              <div
+                style="width: 52px; height: 52px; border-radius: 14px; background: rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: center; margin-bottom: 20px; color: #ffffff;">
+                <svg width="28" height="28" fill="currentColor" viewBox="0 0 24 24">
+                  <path
+                    d="M19 2H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h4l3 3 3-3h4c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 3.5c1.38 0 2.5 1.12 2.5 2.5s-1.12 2.5-2.5 2.5S9.5 9.38 9.5 8s1.12-2.5 2.5-2.5zm4 10.5H8v-1.25c0-1.33 2.67-2 4-2s4 .67 4 2V16z" />
+                </svg>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <h3 style="font-size: 20px; font-weight: 700; color: #ffffff;">Terminal Unlock</h3>
+                <span class="badge">SECURE GATEWAY</span>
+              </div>
+              <p style="color: var(--text-muted); font-size: 14px; line-height: 1.5; margin-bottom: 24px;">
+                Already registered? Enter your Business Code (<code style="color:var(--emerald)">PT-00001</code>) and
+                Master Password to lock this terminal to your shop and access staff logins.
+              </p>
+            </div>
+            <button class="btn btn-glass btn-lg" style="width: 100%;" onclick="openUnlockBizModal()">
+              <span>🔐 Unlock POS Terminal</span>
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Feature Badges Section -->
+      <div class="glass-panel"
+        style="padding: 24px 32px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-top: 40px; text-align: center;">
+        <div style="display: flex; align-items: center; gap: 12px; justify-content: center;">
+          <span style="font-size: 24px;">⚡</span>
+          <div style="text-align: left;">
+            <div style="font-size: 14px; font-weight: 700;">Multi-Device Sync</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Real-time WebSockets</div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; justify-content: center;">
+          <span style="font-size: 24px;">☁️</span>
+          <div style="text-align: left;">
+            <div style="font-size: 14px; font-weight: 700;">Supabase Cloud DB</div>
+            <div style="font-size: 11px; color: var(--text-muted);">With SQLite Fallback</div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; justify-content: center;">
+          <span style="font-size: 24px;">🖨️</span>
+          <div style="text-align: left;">
+            <div style="font-size: 14px; font-weight: 700;">Thermal POS Printing</div>
+            <div style="font-size: 11px; color: var(--text-muted);">80mm, 58mm & A4 Invoices</div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; justify-content: center;">
+          <span style="font-size: 24px;">👥</span>
+          <div style="text-align: left;">
+            <div style="font-size: 14px; font-weight: 700;">Staff Permissions</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Granular role access</div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer
+      style="padding: 24px 32px; border-top: 1px solid var(--border-glass); text-align: center; font-size: 12px; color: var(--text-dim);">
+      SupiriPOS PRO • Powered by <a href="https://prasatek.lk" target="_blank"
+        style="color: var(--cyan); text-decoration: none; font-weight: 600;">PrasaTek System Solutions</a>
+      (pos.prasatek.lk) • All Rights Reserved &copy; 2026
+    </footer>
+  </div>
+
+
+  <!-- ========================================================================= -->
+  <!-- VIEW 2: STAGE 2 - POS STAFF LOGIN SCREEN                                   -->
+  <!-- ========================================================================= -->
+  <div id="view-pos-login"
+    style="display: none; min-height: 100vh; align-items: center; justify-content: center; padding: 20px;">
+    <div class="glass-panel"
+      style="max-width: 440px; width: 100%; padding: 36px; text-align: center; border-color: rgba(6, 182, 212, 0.4);">
+
+      <!-- Business Header in Staff Login -->
+      <div style="margin-bottom: 24px;">
+        <img id="staff-login-biz-logo" src="/assets/logo.png" alt="Shop Logo"
+          style="height: 60px; max-width: 140px; object-fit: contain; margin-bottom: 12px; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5));">
+        <h2 id="staff-login-biz-name" style="font-size: 20px; font-weight: 800; color: #ffffff;">Supiri Mart</h2>
+        <div style="display: inline-flex; align-items: center; gap: 6px; margin-top: 6px;">
+          <span class="badge badge-cyan" id="staff-login-biz-code">PT-DEMO</span>
+          <span class="badge badge-emerald">TERMINAL LOCKED</span>
+        </div>
+      </div>
+
+      <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 24px;">
+        Enter your assigned Cashier / Staff credentials to open your POS shift:
+      </div>
+
+      <form id="form-pos-login" onsubmit="handlePOSLogin(event)" autocomplete="off">
+        <div class="form-group">
+          <label class="form-label">Cashier Username</label>
+          <input type="text" id="pos-login-username" class="form-control" placeholder="e.g. user" required
+            autocomplete="off">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" id="pos-login-password" class="form-control" placeholder="••••••••" required
+            autocomplete="new-password">
+        </div>
+
+        <button type="submit" class="btn btn-emerald btn-lg" style="width: 100%; margin-top: 10px;">
+          <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M10 17l5-5-5-5v10z" />
+          </svg>
+          Open POS Register
+        </button>
+      </form>
+
+      <div
+        style="margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border-glass); display: flex; justify-content: space-between; font-size: 12px;">
+        <a href="javascript:void(0)" onclick="switchBusinessTerminal()"
+          style="color: var(--cyan); text-decoration: none;">
+          🔄 Switch Business
+        </a>
+        <a href="javascript:void(0)" onclick="returnToLanding()" style="color: var(--text-dim); text-decoration: none;">
+          Exit to Landing
+        </a>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ========================================================================= -->
+  <!-- VIEW 3: MAIN POS WORKSPACE (THE 5 CORE PAGES)                              -->
+  <!-- ========================================================================= -->
+  <div id="view-workspace" style="display: none; flex-direction: column; min-height: 100vh; width: 100%; max-width: 100vw; overflow-x: hidden;">
+
+    <!-- Top System Header Bar (Zero-overflow, fits 100% of buttons at 100% laptop zoom) -->
+    <header
+      style="width: 100%; max-width: 100%; min-height: 54px; padding: 6px 12px; border-bottom: 1px solid var(--border-glass); background: rgba(11, 17, 32, 0.92); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: space-between; gap: 8px; position: sticky; top: 0; z-index: 100; flex-shrink: 0; box-sizing: border-box;">
+
+      <!-- Left: Two-Line Stacked Shop Header (Compact max-w-[185px], never widens header) -->
+      <div style="display: flex; align-items: center; gap: 8px; min-width: 0; flex-shrink: 0;">
+        <img id="ws-shop-logo" src="/assets/logo.png" alt="Logo"
+          style="width: 30px; height: 30px; object-fit: contain; flex-shrink: 0;">
+        <div style="display: flex; flex-direction: column; line-height: 1.2; max-width: 185px; min-width: 0;">
+          <!-- Line 1: Shop Name + Business Code Badge -->
+          <div style="display: flex; align-items: center; gap: 5px; min-width: 0;">
+            <span id="ws-shop-name"
+              style="font-size: 13px; font-weight: 800; color: #ffffff; max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block;">Supiri Mart</span>
+            <span id="ws-shop-code" class="badge badge-cyan" style="font-size: 9px; padding: 1px 5px; flex-shrink: 0;">PT-DEMO</span>
+          </div>
+          <!-- Line 2: Live Connection Status + Active Database Engine -->
+          <div style="display: flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 600; white-space: nowrap; margin-top: 2px;">
+            <span id="ws-sync-dot" class="pulse-dot" style="width: 6px; height: 6px; flex-shrink: 0;"></span>
+            <span id="ws-sync-status" style="color: var(--emerald);">Online • Synced</span>
+            <span style="color: var(--text-dim);">•</span>
+            <span id="ws-db-badge" style="color: #06b6d4; font-weight: 700;">Supabase Cloud</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center: All 6 Navigation Tabs 100% Visible Without Clipping -->
+      <nav id="pos-nav-tabs"
+        style="display: flex; align-items: center; justify-content: center; gap: 6px; background: rgba(15, 23, 42, 0.75); padding: 4px; border-radius: 10px; border: 1px solid var(--border-glass); flex-shrink: 0; flex-wrap: wrap;">
+        <button id="nav-btn-dashboard" class="btn btn-sm btn-cyan" style="padding: 6px 12px; font-size: 12px; font-weight: 600; border-radius: 8px; white-space: nowrap; flex-shrink: 0;" onclick="switchPOSTab('dashboard')">
+          📊 Dashboard
+        </button>
+        <button id="nav-btn-billing" class="btn btn-sm btn-glass" style="padding: 6px 12px; font-size: 12px; font-weight: 600; border-radius: 8px; white-space: nowrap; flex-shrink: 0;" onclick="switchPOSTab('billing')">
+          🛒 Billing
+        </button>
+        <button id="nav-btn-items" class="btn btn-sm btn-glass" style="padding: 6px 12px; font-size: 12px; font-weight: 600; border-radius: 8px; white-space: nowrap; flex-shrink: 0;" onclick="switchPOSTab('items')">
+          📦 Products
+        </button>
+        <button id="nav-btn-stock" class="btn btn-sm btn-glass" style="padding: 6px 12px; font-size: 12px; font-weight: 600; border-radius: 8px; white-space: nowrap; flex-shrink: 0;" onclick="switchPOSTab('stock')">
+          📋 Stock
+        </button>
+        <button id="nav-btn-users" class="btn btn-sm btn-glass" style="padding: 6px 12px; font-size: 12px; font-weight: 600; border-radius: 8px; white-space: nowrap; flex-shrink: 0;" onclick="switchPOSTab('users')">
+          👥 Staff
+        </button>
+        <button id="nav-btn-reports" class="btn btn-sm btn-glass" style="padding: 6px 12px; font-size: 12px; font-weight: 600; border-radius: 8px; white-space: nowrap; flex-shrink: 0;" onclick="switchPOSTab('reports')">
+          📈 Reports
+        </button>
+      </nav>
+
+      <!-- Right: Compact User Pill, Guide & Logout — 100% VISIBLE AT 100% ZOOM -->
+      <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+        <div class="badge"
+          style="background: rgba(255, 255, 255, 0.06); border: 1px solid var(--border-glass); padding: 5px 10px; font-size: 11px; font-weight: 600; color: #f8fafc; text-transform: none; white-space: nowrap; display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
+          <span>👤</span>
+          <span id="ws-staff-user" style="max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block;">Supiri Admin</span>
+          <span id="ws-staff-role" class="hide-below-2xl" style="color: var(--cyan); font-size: 10px;">• Manager</span>
+        </div>
+
+        <span id="ws-clock" class="hide-below-2xl"
+          style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); font-weight: 600; min-width: 70px; text-align: center;">12:00:00 PM</span>
+
+        <button class="btn btn-glass btn-sm" style="padding: 6px 10px; font-size: 12px; flex-shrink: 0;" onclick="openUserGuideModal()" title="Help Guide">
+          📖 Guide
+        </button>
+        <button class="btn btn-glass btn-sm" style="padding: 6px 8px; font-size: 12px; flex-shrink: 0;" onclick="toggleFullscreen()" title="Full Screen">
+          ⛶
+        </button>
+        <button class="btn btn-danger btn-sm" style="padding: 6px 10px; font-size: 12px; flex-shrink: 0;" onclick="logoutStaffUser()" title="Logout Staff User">
+          🚪 Logout
+        </button>
+      </div>
+    </header>
+
+    <!-- POS Content Container -->
+    <main
+      style="flex: 1; height: calc(100vh - 54px); min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 12px 16px; box-sizing: border-box; width: 100%; max-width: 100vw; margin: 0 auto;">
+
+      <!-- =================================================================== -->
+      <!-- TAB 0: 📊 OVERVIEW DASHBOARD (ENTERPRISE INTELLIGENCE)             -->
+      <!-- =================================================================== -->
+      <section id="tab-dashboard" class="pos-tab-section active-tab-flex"
+        style="display: flex; flex-direction: column; gap: 14px;">
+
+        <!-- Top 6 KPI Cards Grid (All 6 sit in one clean row on laptops at 100% zoom) -->
+        <div class="dash-kpi-grid">
+          <!-- Card 1: Today's Sales -->
+          <div class="glass-panel"
+            style="padding: 13px 14px; min-width: 0; border-color: rgba(16, 185, 129, 0.4); background: linear-gradient(180deg, rgba(16, 185, 129, 0.1) 0%, rgba(15, 23, 42, 0.7) 100%);">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
+              <span style="font-size: 10px; font-weight: 700; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">💰 TODAY'S SALES (අද ආදායම)</span>
+              <span style="font-size: 15px; flex-shrink: 0;">💵</span>
+            </div>
+            <div id="dash-kpi-today-sales"
+              style="font-size: clamp(17px, 1.4vw, 22px); font-weight: 800; color: var(--emerald); font-family: var(--font-mono); margin: 5px 0 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              Rs. 0.00</div>
+            <div id="dash-kpi-today-bills" style="font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">0 bills completed today</div>
+          </div>
+
+          <!-- Card 2: 7 Days Sales -->
+          <div class="glass-panel"
+            style="padding: 13px 14px; min-width: 0; border-color: rgba(6, 182, 212, 0.4); background: linear-gradient(180deg, rgba(6, 182, 212, 0.1) 0%, rgba(15, 23, 42, 0.7) 100%);">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
+              <span style="font-size: 10px; font-weight: 700; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">📅 LAST 7 DAYS (පසුගිය සතිය)</span>
+              <span style="font-size: 15px; flex-shrink: 0;">📈</span>
+            </div>
+            <div id="dash-kpi-week-sales"
+              style="font-size: clamp(17px, 1.4vw, 22px); font-weight: 800; color: var(--cyan); font-family: var(--font-mono); margin: 5px 0 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              Rs. 0.00</div>
+            <div style="font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Weekly revenue stream</div>
+          </div>
+
+          <!-- Card 3: 30 Days Sales -->
+          <div class="glass-panel"
+            style="padding: 13px 14px; min-width: 0; border-color: rgba(147, 51, 234, 0.4); background: linear-gradient(180deg, rgba(147, 51, 234, 0.1) 0%, rgba(15, 23, 42, 0.7) 100%);">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
+              <span style="font-size: 10px; font-weight: 700; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">📆 LAST 30 DAYS (පසුගිය මාසය)</span>
+              <span style="font-size: 15px; flex-shrink: 0;">📊</span>
+            </div>
+            <div id="dash-kpi-month-sales"
+              style="font-size: clamp(17px, 1.4vw, 22px); font-weight: 800; color: #c084fc; font-family: var(--font-mono); margin: 5px 0 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              Rs. 0.00</div>
+            <div style="font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Monthly performance</div>
+          </div>
+
+          <!-- Card 4: Total Products -->
+          <div class="glass-panel" style="padding: 13px 14px; min-width: 0; border-color: rgba(255, 255, 255, 0.15);">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
+              <span style="font-size: 10px; font-weight: 700; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">📦 TOTAL PRODUCTS (මුළු භාණ්ඩ)</span>
+              <span style="font-size: 15px; flex-shrink: 0;">🏷️</span>
+            </div>
+            <div id="dash-kpi-total-items"
+              style="font-size: clamp(17px, 1.4vw, 22px); font-weight: 800; color: #ffffff; font-family: var(--font-mono); margin: 5px 0 2px 0;">
+              0</div>
+            <div style="font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Active catalog SKUs</div>
+          </div>
+
+          <!-- Card 5: Active Staff Users -->
+          <div class="glass-panel" style="padding: 13px 14px; min-width: 0; border-color: rgba(59, 130, 246, 0.4);">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
+              <span style="font-size: 10px; font-weight: 700; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">👥 STAFF USERS (සේවකයින්)</span>
+              <span style="font-size: 15px; flex-shrink: 0;">🧑‍💼</span>
+            </div>
+            <div id="dash-kpi-staff-count"
+              style="font-size: clamp(17px, 1.4vw, 22px); font-weight: 800; color: #60a5fa; font-family: var(--font-mono); margin: 5px 0 2px 0;">
+              1</div>
+            <div style="font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Authorized POS users</div>
+          </div>
+
+          <!-- Card 6: INTERACTIVE Low Stock Alerts -->
+          <div class="glass-panel glass-panel-interactive" onclick="openLowStockModal()"
+            style="padding: 13px 14px; min-width: 0; border-color: rgba(245, 158, 11, 0.5); background: linear-gradient(180deg, rgba(245, 158, 11, 0.12) 0%, rgba(15, 23, 42, 0.7) 100%); cursor: pointer;"
+            title="Click to view all low stock products & restock">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
+              <span style="font-size: 10px; font-weight: 700; color: var(--warning); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">⚠️ LOW STOCK (අඩු තොග)</span>
+              <span class="badge badge-warning" style="font-size: 9px; padding: 2px 6px; flex-shrink: 0;">REVIEW</span>
+            </div>
+            <div id="dash-kpi-low-stock"
+              style="font-size: clamp(17px, 1.4vw, 22px); font-weight: 800; color: var(--warning); font-family: var(--font-mono); margin: 5px 0 2px 0;">
+              0</div>
+            <div
+              style="font-size: 11px; color: var(--warning); font-weight: 600; display: flex; align-items: center; gap: 4px; white-space: nowrap;">
+              <span>Tap to restock</span>
+              <span>➔</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Side-by-Side Live Invoices Feed & Top Selling Items (Directly below KPIs, no Quick Actions) -->
+        <div class="dash-feeds-grid">
+
+          <!-- Left: Recent 5 Invoices Live Feed -->
+          <div class="glass-panel" style="padding: 16px 18px; min-width: 0;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+              <h3
+                style="font-size: 14px; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 8px;">
+                <span>🧾 Recent Sales Invoices (Live Feed)</span>
+                <span class="pulse-dot"></span>
+              </h3>
+              <button class="btn btn-glass btn-sm" onclick="switchPOSTab('reports')">View All Invoices ➔</button>
+            </div>
+            <div style="overflow-x: auto;">
+              <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 12.5px;">
+                <thead>
+                  <tr style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted);">
+                    <th style="padding: 8px;">Invoice #</th>
+                    <th style="padding: 8px;">Date & Time</th>
+                    <th style="padding: 8px;">Cashier</th>
+                    <th style="padding: 8px; text-align: right;">Amount (Rs.)</th>
+                    <th style="padding: 8px; text-align: center;">Payment</th>
+                    <th style="padding: 8px; text-align: center;">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="dash-recent-invoices-body">
+                  <!-- Populated by pos.js -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Right: Top Selling Products Leaderboard -->
+          <div class="glass-panel" style="padding: 16px 18px; min-width: 0;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+              <h3
+                style="font-size: 14px; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 8px;">
+                <span>🔥 Top Selling Items</span>
+              </h3>
+              <span class="badge badge-cyan" style="font-size: 10px;">LAST 7 DAYS</span>
+            </div>
+            <div id="dash-top-selling-list" style="display: flex; flex-direction: column; gap: 8px;">
+              <!-- Populated by pos.js -->
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- TAB 1: 🛒 BILLING TERMINAL (CASHIER REGISTER)                       -->
+      <!-- =================================================================== -->
+      <section id="tab-billing" class="pos-tab-section"
+        style="display: none; grid-template-columns: minmax(0, 1fr) 390px; gap: 14px; height: calc(100vh - 78px); min-height: 0; max-height: calc(100vh - 78px); width: 100%; overflow: hidden;">
+
+        <!-- Left: Product Catalog & Search Bar -->
+        <div class="glass-panel"
+          style="height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; padding: 16px;">
+
+          <!-- Search & Barcode Bar -->
+          <div style="display: flex; gap: 10px; margin-bottom: 12px; flex-shrink: 0;">
+            <div style="flex: 1; position: relative;">
+              <input type="text" id="billing-search-input" class="form-control"
+                style="width: 100%; padding-left: 40px; font-size: 15px;"
+                placeholder="🔍 Scan Barcode or Type Product Name (Press Enter to Add)..."
+                oninput="filterBillingItems()" onkeydown="handleBarcodeEnter(event)" autocomplete="off">
+              <span style="position: absolute; left: 14px; top: 12px; color: var(--text-dim);">
+                <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24">
+                  <path
+                    d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+                </svg>
+              </span>
+            </div>
+          </div>
+
+          <!-- Category Filter Pills -->
+          <div id="billing-categories-bar"
+            style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 10px; flex-shrink: 0;">
+            <button class="btn btn-sm btn-cyan" onclick="selectBillingCategory('All')">All Items</button>
+            <button class="btn btn-sm btn-glass" onclick="selectBillingCategory('Groceries')">Groceries</button>
+            <button class="btn btn-sm btn-glass" onclick="selectBillingCategory('Dairy')">Dairy</button>
+            <button class="btn btn-sm btn-glass" onclick="selectBillingCategory('Beverages')">Beverages</button>
+            <button class="btn btn-sm btn-glass" onclick="selectBillingCategory('Snacks')">Snacks</button>
+            <button class="btn btn-sm btn-glass" onclick="selectBillingCategory('Household')">Household</button>
+            <button class="btn btn-sm btn-glass" onclick="selectBillingCategory('Personal Care')">Personal Care</button>
+            <button class="btn btn-sm btn-glass" onclick="selectBillingCategory('Apparel')">Apparel</button>
+          </div>
+
+          <!-- Items Grid: Only this part scrolls within the catalog! -->
+          <div id="billing-items-grid"
+            style="flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; align-content: start; padding-right: 4px;">
+            <!-- Rendered by pos.js -->
+          </div>
+        </div>
+
+        <!-- Right: Active Bill / Cart Panel (Fixed Flex, Bottom pinned) -->
+        <div class="glass-panel"
+          style="height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; padding: 16px; border-color: rgba(6, 182, 212, 0.4);">
+
+          <!-- Cart Header (Pinned top) -->
+          <div
+            style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-glass); padding-bottom: 10px; margin-bottom: 10px; flex-shrink: 0;">
+            <div>
+              <div style="font-size: 15px; font-weight: 800; color: #ffffff;">Current Sale</div>
+              <div id="cart-item-count" style="font-size: 11px; color: var(--text-muted);">0 items in bill</div>
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <button class="btn btn-sm btn-glass" onclick="holdCurrentBill()" title="Hold this bill for later">
+                ⏸️ Hold
+              </button>
+              <button class="btn btn-sm btn-glass" onclick="openRecallBillsModal()" id="btn-recall-badge"
+                title="Recall held bills">
+                📥 Recall (<span id="held-bills-count">0</span>)
+              </button>
+              <button class="btn btn-sm btn-danger" onclick="clearCurrentCart()" title="Clear bill">
+                🗑️
+              </button>
+            </div>
+          </div>
+
+          <!-- Cart Items Scrollable List: ONLY THIS SCROLLS! -->
+          <div id="cart-items-list"
+            style="flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px; margin-bottom: 8px;">
+            <div style="text-align: center; color: var(--text-dim); margin-top: 50px;">
+              <span style="font-size: 32px; display: block; margin-bottom: 8px;">🛒</span>
+              Cart is empty.<br>Scan barcode or tap items to add.
+            </div>
+          </div>
+
+          <!-- Bill Summary & Tender Section: 100% PINNED & VISIBLE AT THE BOTTOM AT ALL TIMES -->
+          <div
+            style="flex-shrink: 0; border-top: 1px solid var(--border-glass); background: rgba(11, 17, 32, 0.75); margin: 0 -16px -16px -16px; padding: 12px 16px 14px 16px; border-radius: 0 0 16px 16px;">
+
+            <!-- Subtotal & Discount Rows -->
+            <div
+              style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">
+              <span>Subtotal:</span>
+              <span id="bill-subtotal"
+                style="font-family: var(--font-mono); color: var(--text-main); font-weight: 600;">Rs. 0.00</span>
+            </div>
+
+            <div
+              style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">
+              <span>Discount (Rs):</span>
+              <input type="number" id="bill-discount-input" class="form-control"
+                style="width: 90px; padding: 3px 6px; font-size: 12px; text-align: right; font-family: var(--font-mono);"
+                value="0" min="0" oninput="calculateBillTotals()">
+            </div>
+
+            <!-- Grand Total -->
+            <div
+              style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed var(--border-glass); padding-top: 6px; margin-bottom: 8px;">
+              <span style="font-size: 14px; font-weight: 700; color: #ffffff;">Net Payable:</span>
+              <span id="bill-grand-total"
+                style="font-size: 22px; font-weight: 800; color: var(--cyan); font-family: var(--font-mono);">Rs.
+                0.00</span>
+            </div>
+
+            <!-- Payment Mode Pills -->
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 8px;">
+              <button class="btn btn-sm btn-cyan pay-mode-btn" data-mode="Cash"
+                onclick="selectPaymentMode('Cash')">Cash</button>
+              <button class="btn btn-sm btn-glass pay-mode-btn" data-mode="Card"
+                onclick="selectPaymentMode('Card')">Card</button>
+              <button class="btn btn-sm btn-glass pay-mode-btn" data-mode="QR"
+                onclick="selectPaymentMode('QR')">QR/Bank</button>
+              <button class="btn btn-sm btn-glass pay-mode-btn" data-mode="Credit"
+                onclick="selectPaymentMode('Credit')">ණයට</button>
+            </div>
+
+            <!-- Cash Tender Quick Buttons -->
+            <div id="cash-tender-shortcuts" style="display: flex; gap: 4px; margin-bottom: 8px;">
+              <button class="btn btn-sm btn-glass" style="flex: 1; font-size: 11px; padding: 3px;"
+                onclick="addTenderAmount(500)">+500</button>
+              <button class="btn btn-sm btn-glass" style="flex: 1; font-size: 11px; padding: 3px;"
+                onclick="addTenderAmount(1000)">+1,000</button>
+              <button class="btn btn-sm btn-glass" style="flex: 1; font-size: 11px; padding: 3px;"
+                onclick="addTenderAmount(5000)">+5,000</button>
+              <button class="btn btn-sm btn-glass" style="flex: 1; font-size: 11px; padding: 3px;"
+                onclick="setExactTender()">Exact</button>
+            </div>
+
+            <!-- Cash Tendered Input & Balance / Change -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+              <div>
+                <label style="font-size: 10px; color: var(--text-dim); display: block; margin-bottom: 2px;">Cash
+                  Received (රු.)</label>
+                <input type="number" id="bill-cash-received" class="form-control"
+                  style="font-size: 15px; font-weight: 700; font-family: var(--font-mono); color: #ffffff; padding: 6px 10px;"
+                  placeholder="0.00" oninput="calculateBillTotals()">
+              </div>
+              <div style="text-align: right;">
+                <label style="font-size: 10px; color: var(--emerald); display: block; margin-bottom: 2px;">Balance /
+                  Change (ඉතුරු)</label>
+                <div id="bill-change-due"
+                  style="font-size: 18px; font-weight: 800; font-family: var(--font-mono); color: var(--emerald); padding-top: 4px;">
+                  Rs. 0.00</div>
+              </div>
+            </div>
+
+            <!-- Complete Sale Button: ALWAYS VISIBLE, NEVER CUT OFF -->
+            <button class="btn btn-emerald btn-lg"
+              style="width: 100%; font-size: 15px; font-weight: 800; padding: 12px; box-shadow: 0 4px 20px var(--emerald-glow);"
+              onclick="completeSaleAndPrint()">
+              <span>🖨️ Complete Sale & Print (F9)</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- TAB 2: 📦 ITEMS / PRODUCT CATALOG                                   -->
+      <!-- =================================================================== -->
+      <section id="tab-items" class="pos-tab-section" style="display: none; flex-direction: column; gap: 20px;">
+        <div class="glass-panel"
+          style="padding: 20px; display: flex; align-items: center; justify-content: space-between; gap: 14px;">
+          <div style="display: flex; align-items: center; gap: 14px; flex: 1;">
+            <input type="text" id="items-search-input" class="form-control" style="max-width: 320px;"
+              placeholder="🔍 Search product name or barcode..." oninput="loadItemsTable()">
+            <select id="items-category-filter" class="form-control" style="max-width: 180px;"
+              onchange="loadItemsTable()">
+              <option value="All">All Categories</option>
+              <option value="Groceries">Groceries</option>
+              <option value="Dairy">Dairy</option>
+              <option value="Beverages">Beverages</option>
+              <option value="Snacks">Snacks</option>
+              <option value="Household">Household</option>
+              <option value="Personal Care">Personal Care</option>
+              <option value="Apparel">Apparel</option>
+            </select>
+          </div>
+          <button class="btn btn-emerald" onclick="openAddItemModal()">
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+            </svg>
+            Add New Product
+          </button>
+        </div>
+
+        <div class="glass-panel" style="padding: 20px; overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+            <thead>
+              <tr style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted);">
+                <th style="padding: 12px;">Barcode / Code</th>
+                <th style="padding: 12px;">Product Name</th>
+                <th style="padding: 12px;">Category</th>
+                <th style="padding: 12px;">Unit</th>
+                <th style="padding: 12px; text-align: right;">Cost Price (Rs.)</th>
+                <th style="padding: 12px; text-align: right;">Selling Price (Rs.)</th>
+                <th style="padding: 12px; text-align: right;">Margin %</th>
+                <th style="padding: 12px; text-align: center;">Stock Available</th>
+                <th style="padding: 12px; text-align: right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="items-table-body">
+              <!-- Populated by pos.js -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- TAB 3: 📊 STOCK MANAGE / INVENTORY                                  -->
+      <!-- =================================================================== -->
+      <section id="tab-stock" class="pos-tab-section" style="display: none; flex-direction: column; gap: 20px;">
+
+        <!-- Stock KPI Banner -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
+          <div class="glass-panel" style="padding: 20px; border-color: rgba(16, 185, 129, 0.3);">
+            <div style="font-size: 12px; color: var(--text-muted); font-weight: 600;">TOTAL INVENTORY ITEMS</div>
+            <div id="stock-kpi-total-items" style="font-size: 28px; font-weight: 800; color: #ffffff; margin-top: 4px;">
+              0</div>
+          </div>
+          <div class="glass-panel" style="padding: 20px; border-color: rgba(6, 182, 212, 0.3);">
+            <div style="font-size: 12px; color: var(--text-muted); font-weight: 600;">ACTIVE IN STOCK</div>
+            <div id="stock-kpi-in-stock"
+              style="font-size: 28px; font-weight: 800; color: var(--emerald); margin-top: 4px;">0</div>
+          </div>
+          <div class="glass-panel" style="padding: 20px; border-color: rgba(245, 158, 11, 0.3);">
+            <div style="font-size: 12px; color: var(--text-muted); font-weight: 600;">LOW STOCK WARNINGS</div>
+            <div id="stock-kpi-low-stock"
+              style="font-size: 28px; font-weight: 800; color: var(--warning); margin-top: 4px;">0</div>
+          </div>
+          <div class="glass-panel" style="padding: 20px; border-color: rgba(239, 68, 68, 0.3);">
+            <div style="font-size: 12px; color: var(--text-muted); font-weight: 600;">OUT OF STOCK ITEMS</div>
+            <div id="stock-kpi-out-stock"
+              style="font-size: 28px; font-weight: 800; color: var(--danger); margin-top: 4px;">0</div>
+          </div>
+        </div>
+
+        <!-- Add / Remove Stock Action Panel -->
+        <div class="glass-panel" style="padding: 24px; border-color: rgba(16, 185, 129, 0.4);">
+          <h3
+            style="font-size: 16px; font-weight: 700; margin-bottom: 16px; color: #ffffff; display: flex; align-items: center; gap: 8px;">
+            <span>⚡ Quick Stock In / Out Adjustment Panel</span>
+          </h3>
+          <form id="form-stock-adjust" onsubmit="handleStockAdjust(event)"
+            style="display: grid; grid-template-columns: 2fr 1.2fr 1fr 2fr auto; gap: 14px; align-items: end;">
+            <div class="form-group" style="margin: 0;">
+              <label class="form-label">Select Product</label>
+              <select id="stock-adjust-item" class="form-control" required>
+                <!-- Populated by pos.js -->
+              </select>
+            </div>
+
+            <div class="form-group" style="margin: 0;">
+              <label class="form-label">Action</label>
+              <select id="stock-adjust-type" class="form-control" required>
+                <option value="IN">➕ Stock In (New Arrival)</option>
+                <option value="OUT">➖ Stock Out (Damaged / Return)</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="margin: 0;">
+              <label class="form-label">Quantity</label>
+              <input type="number" id="stock-adjust-qty" class="form-control" style="font-family: var(--font-mono);"
+                min="1" step="any" placeholder="Qty" required>
+            </div>
+
+            <div class="form-group" style="margin: 0;">
+              <label class="form-label">Note / Supplier Reference</label>
+              <input type="text" id="stock-adjust-note" class="form-control"
+                placeholder="e.g. GRN-402 / Fresh batch delivery">
+            </div>
+
+            <button type="submit" class="btn btn-emerald" style="height: 44px;">
+              Update Stock
+            </button>
+          </form>
+        </div>
+
+        <!-- Live Stock Movement Logs Table -->
+        <div class="glass-panel" style="padding: 20px;">
+          <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 14px; color: #ffffff;">Recent Stock Movement Log
+            (Real-Time Audit Trail)</h3>
+          <div style="max-height: 400px; overflow-y: auto;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+              <thead>
+                <tr
+                  style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted); position: sticky; top: 0; background: var(--bg-dark);">
+                  <th style="padding: 10px;">Date & Time</th>
+                  <th style="padding: 10px;">Item Code & Name</th>
+                  <th style="padding: 10px;">Movement Type</th>
+                  <th style="padding: 10px; text-align: right;">Quantity Change</th>
+                  <th style="padding: 10px; text-align: right;">New Stock Level</th>
+                  <th style="padding: 10px;">Staff Member</th>
+                  <th style="padding: 10px;">Reference Note</th>
+                </tr>
+              </thead>
+              <tbody id="stock-logs-table-body">
+                <!-- Populated by pos.js -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- TAB 4: 👥 USERS & ROLE ACCESS                                       -->
+      <!-- =================================================================== -->
+      <section id="tab-users" class="pos-tab-section" style="display: none; flex-direction: column; gap: 20px;">
+        <div class="glass-panel"
+          style="padding: 20px; display: flex; align-items: center; justify-content: space-between;">
+          <div>
+            <h2 style="font-size: 18px; font-weight: 800; color: #ffffff;">Staff Users & Granular Access Control</h2>
+            <p style="font-size: 13px; color: var(--text-muted);">Manage cashiers, supervisors and assign permissions
+              for each section.</p>
+          </div>
+          <button class="btn btn-emerald" onclick="openAddUserModal()">
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24">
+              <path
+                d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+            </svg>
+            Add New Staff Account
+          </button>
+        </div>
+
+        <div class="glass-panel" style="padding: 20px; overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+            <thead>
+              <tr style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted);">
+                <th style="padding: 12px;">Username</th>
+                <th style="padding: 12px;">Full Name</th>
+                <th style="padding: 12px;">Role Title</th>
+                <th style="padding: 12px;">Granted Page Access</th>
+                <th style="padding: 12px; text-align: right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="users-table-body">
+              <!-- Populated by pos.js -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- TAB 5: 📈 REPORTS, BIN CARD & AUDIT TRAIL                          -->
+      <!-- =================================================================== -->
+      <section id="tab-reports" class="pos-tab-section" style="display: none; flex-direction: column; gap: 18px;">
+
+        <!-- Reports 3-Sub-Tab Navigation Bar -->
+        <div
+          style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-glass); padding-bottom: 12px; flex-wrap: wrap; gap: 12px;">
+          <div
+            style="display: flex; gap: 8px; background: rgba(15, 23, 42, 0.7); padding: 4px; border-radius: 12px; border: 1px solid var(--border-glass);">
+            <button id="subnav-btn-sales" class="btn btn-sm btn-cyan" onclick="switchReportsSubTab('sales')">
+              📊 Sales & Profit Summary
+            </button>
+            <button id="subnav-btn-bincard" class="btn btn-sm btn-glass" onclick="switchReportsSubTab('bincard')">
+              🗂️ Item Bin Card (Stock Ledger)
+            </button>
+            <button id="subnav-btn-activity" class="btn btn-sm btn-glass" onclick="switchReportsSubTab('activity')">
+              🕵️ User Activity Log
+            </button>
+          </div>
+
+          <div id="reports-export-container">
+            <button class="btn btn-sm btn-emerald" onclick="exportReportCSV()">
+              📥 Export Sales CSV
+            </button>
+          </div>
+        </div>
+
+        <!-- SUB-TAB A: 📊 Sales & Profit Summary + Bill History -->
+        <div id="subtab-reports-sales" class="reports-subtab-section active-subtab"
+          style="display: flex; flex-direction: column; gap: 18px;">
+          <!-- Date Filters -->
+          <div class="glass-panel"
+            style="padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button class="btn btn-sm btn-cyan report-range-btn" onclick="selectReportRange('today')">Today</button>
+              <button class="btn btn-sm btn-glass report-range-btn"
+                onclick="selectReportRange('yesterday')">Yesterday</button>
+              <button class="btn btn-sm btn-glass report-range-btn" onclick="selectReportRange('this_week')">This
+                Week</button>
+              <button class="btn btn-sm btn-glass report-range-btn" onclick="selectReportRange('this_month')">This
+                Month</button>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <input type="date" id="report-custom-start" class="form-control"
+                style="padding: 6px 10px; font-size: 12px;">
+              <span style="color: var(--text-dim);">to</span>
+              <input type="date" id="report-custom-end" class="form-control"
+                style="padding: 6px 10px; font-size: 12px;">
+              <button class="btn btn-sm btn-glass" onclick="applyCustomReportRange()">Filter Range</button>
+            </div>
+          </div>
+
+          <!-- 4 KPI Summary Cards -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
+            <div class="glass-panel" style="padding: 20px; border-color: rgba(16, 185, 129, 0.4);">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span style="font-size: 11px; color: var(--text-muted); font-weight: 700;">TOTAL SALES REVENUE</span>
+                <span style="font-size: 18px;">💰</span>
+              </div>
+              <div id="kpi-total-sales"
+                style="font-size: 26px; font-weight: 800; color: var(--emerald); font-family: var(--font-mono); margin-top: 6px;">
+                Rs. 0.00</div>
+            </div>
+
+            <div class="glass-panel" style="padding: 20px; border-color: rgba(6, 182, 212, 0.4);">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span style="font-size: 11px; color: var(--text-muted); font-weight: 700;">ESTIMATED GROSS PROFIT</span>
+                <span style="font-size: 18px;">📈</span>
+              </div>
+              <div id="kpi-net-profit"
+                style="font-size: 26px; font-weight: 800; color: var(--cyan); font-family: var(--font-mono); margin-top: 6px;">
+                Rs. 0.00</div>
+            </div>
+
+            <div class="glass-panel" style="padding: 20px; border-color: rgba(255, 255, 255, 0.15);">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span style="font-size: 11px; color: var(--text-muted); font-weight: 700;">INVOICES ISSUED</span>
+                <span style="font-size: 18px;">🧾</span>
+              </div>
+              <div id="kpi-total-invoices"
+                style="font-size: 26px; font-weight: 800; color: #ffffff; font-family: var(--font-mono); margin-top: 6px;">
+                0</div>
+            </div>
+
+            <div class="glass-panel" style="padding: 20px; border-color: rgba(245, 158, 11, 0.4);">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span style="font-size: 11px; color: var(--text-muted); font-weight: 700;">LOW STOCK ITEMS</span>
+                <span style="font-size: 18px;">⚠️</span>
+              </div>
+              <div id="kpi-low-stock-count"
+                style="font-size: 26px; font-weight: 800; color: var(--warning); font-family: var(--font-mono); margin-top: 6px;">
+                0</div>
+            </div>
+          </div>
+
+          <!-- Sales Invoices History Table -->
+          <div class="glass-panel" style="padding: 20px; overflow-x: auto;">
+            <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 14px; color: #ffffff;">Sales & Invoice History
+            </h3>
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+              <thead>
+                <tr style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted);">
+                  <th style="padding: 10px;">Invoice #</th>
+                  <th style="padding: 10px;">Date & Time</th>
+                  <th style="padding: 10px;">Cashier</th>
+                  <th style="padding: 10px;">Payment Method</th>
+                  <th style="padding: 10px; text-align: right;">Total Amount</th>
+                  <th style="padding: 10px; text-align: center;">Status</th>
+                  <th style="padding: 10px; text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="invoices-table-body">
+                <!-- Populated by pos.js -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SUB-TAB B: 🗂️ Item Bin Card (භාණ්ඩ තොග ඉතිහාසය / Stock Ledger) -->
+        <div id="subtab-reports-bincard" class="reports-subtab-section"
+          style="display: none; flex-direction: column; gap: 18px;">
+          <!-- Bin Card Filter Toolbar -->
+          <div class="glass-panel"
+            style="padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+            <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 280px;">
+              <label class="form-label" style="margin: 0; white-space: nowrap;">Select Product:</label>
+              <select id="bincard-item-select" class="form-control" style="flex: 1;" onchange="loadBinCardData()">
+                <!-- Populated by pos.js -->
+              </select>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <input type="date" id="bincard-start-date" class="form-control"
+                style="padding: 6px 10px; font-size: 12px;">
+              <span style="color: var(--text-dim);">to</span>
+              <input type="date" id="bincard-end-date" class="form-control" style="padding: 6px 10px; font-size: 12px;">
+              <button class="btn btn-sm btn-glass" onclick="loadBinCardData()">Filter</button>
+              <button class="btn btn-sm btn-cyan" onclick="printBinCardStatement()">
+                🖨️ Print / Export Bin Card
+              </button>
+            </div>
+          </div>
+
+          <!-- Product Overview Badge Card -->
+          <div id="bincard-item-header-card" class="glass-panel"
+            style="padding: 18px 24px; border-color: rgba(6, 182, 212, 0.4); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <h3 id="bincard-header-name" style="font-size: 18px; font-weight: 800; color: #ffffff;">Product Name
+                </h3>
+                <span id="bincard-header-code" class="badge badge-cyan">001</span>
+                <span id="bincard-header-category" class="badge badge-glass">Groceries</span>
+              </div>
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+                Official Stock Ledger (Bin Card) • Running Balance Verification
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 24px;">
+              <div>
+                <div style="font-size: 11px; color: var(--text-muted);">CURRENT ON-HAND STOCK</div>
+                <div id="bincard-header-stock"
+                  style="font-size: 22px; font-weight: 800; color: var(--emerald); font-family: var(--font-mono);">0 Pcs
+                </div>
+              </div>
+              <div>
+                <div style="font-size: 11px; color: var(--text-muted);">ALERT THRESHOLD</div>
+                <div id="bincard-header-alert"
+                  style="font-size: 22px; font-weight: 800; color: var(--warning); font-family: var(--font-mono);">5 Pcs
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chronological Bin Card Movements Table -->
+          <div class="glass-panel" style="padding: 20px; overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+              <thead>
+                <tr
+                  style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted); background: rgba(11, 17, 32, 0.4);">
+                  <th style="padding: 12px;">Date & Time</th>
+                  <th style="padding: 12px;">Transaction Type</th>
+                  <th style="padding: 12px;">Reference / Note</th>
+                  <th style="padding: 12px; text-align: right; color: var(--emerald);">Qty In (+)</th>
+                  <th style="padding: 12px; text-align: right; color: var(--danger);">Qty Out (-)</th>
+                  <th style="padding: 12px; text-align: right; color: var(--cyan); font-weight: 700;">Running Balance
+                  </th>
+                  <th style="padding: 12px;">Performed By (Staff)</th>
+                </tr>
+              </thead>
+              <tbody id="bincard-table-body">
+                <!-- Populated by pos.js -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SUB-TAB C: 🕵️ User Activity Log (සේවක ක්‍රියාකාරකම් පරීක්ෂාව) -->
+        <div id="subtab-reports-activity" class="reports-subtab-section"
+          style="display: none; flex-direction: column; gap: 18px;">
+          <!-- Activity Filter Toolbar -->
+          <div class="glass-panel"
+            style="padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <label class="form-label" style="margin: 0; font-size: 12px;">Staff User:</label>
+                <select id="activity-filter-user" class="form-control" style="padding: 6px 10px; font-size: 12px;"
+                  onchange="loadActivityLogsData()">
+                  <option value="ALL">All Staff Members</option>
+                </select>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <label class="form-label" style="margin: 0; font-size: 12px;">Action Type:</label>
+                <select id="activity-filter-action" class="form-control" style="padding: 6px 10px; font-size: 12px;"
+                  onchange="loadActivityLogsData()">
+                  <option value="ALL">All Action Types</option>
+                  <option value="LOGIN">🔑 Staff Login</option>
+                  <option value="LOGOUT">🚪 Staff Logout</option>
+                  <option value="BILL_CREATED">🧾 Bill Created</option>
+                  <option value="BILL_VOIDED">❌ Bill Voided</option>
+                  <option value="STOCK_ADJUST">📦 Stock In/Out</option>
+                  <option value="ITEM_CREATED">➕ Product Added</option>
+                  <option value="ITEM_UPDATED">✏️ Product Edited</option>
+                  <option value="ITEM_DELETED">🗑️ Product Deleted</option>
+                  <option value="USER_CREATED">👤 Staff User Added</option>
+                  <option value="USER_UPDATED">⚙️ Staff User Updated</option>
+                  <option value="ADMIN_CREDENTIALS_CHANGED">🔐 Admin Credentials Changed</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="date" id="activity-start-date" class="form-control"
+                style="padding: 6px 10px; font-size: 12px;">
+              <span style="color: var(--text-dim);">to</span>
+              <input type="date" id="activity-end-date" class="form-control"
+                style="padding: 6px 10px; font-size: 12px;">
+              <button class="btn btn-sm btn-cyan" onclick="loadActivityLogsData()">Filter Audit Trail</button>
+            </div>
+          </div>
+
+          <!-- Activity Logs Table -->
+          <div class="glass-panel" style="padding: 20px; overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+              <thead>
+                <tr style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted);">
+                  <th style="padding: 10px;">Date & Time</th>
+                  <th style="padding: 10px;">Staff Member</th>
+                  <th style="padding: 10px;">Action</th>
+                  <th style="padding: 10px;">Audit Details</th>
+                </tr>
+              </thead>
+              <tbody id="activity-table-body">
+                <!-- Populated by pos.js -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+  </div>
+
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: STAGE 1 - BUSINESS TERMINAL UNLOCK                                  -->
+  <!-- ========================================================================= -->
+  <div id="modal-unlock-biz" class="modal-backdrop">
+    <div class="modal-card glass-panel" style="max-width: 420px; border-color: rgba(6, 182, 212, 0.4);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 style="font-size: 18px; font-weight: 800; color: #ffffff;">Unlock Business Terminal</h3>
+        <button class="btn btn-sm btn-glass" onclick="closeUnlockBizModal()">✕</button>
+      </div>
+
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">
+        Enter your Business Code (<code style="color:var(--emerald);">PT-00001</code>) and Master Password to lock this
+        station to your business.
+      </p>
+
+      <form id="form-unlock-biz" onsubmit="handleUnlockBiz(event)" autocomplete="off">
+        <div class="form-group">
+          <label class="form-label">Business Code</label>
+          <input type="text" id="unlock-biz-code" class="form-control" placeholder="e.g. PT-00001"
+            style="text-transform: uppercase; font-family: var(--font-mono); font-weight: 700;" required
+            autocomplete="off">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Business Master Password</label>
+          <input type="password" id="unlock-biz-pass" class="form-control" placeholder="••••••••" required
+            autocomplete="new-password">
+        </div>
+
+        <button type="submit" class="btn btn-cyan btn-lg" style="width: 100%; margin-top: 10px;">
+          🔓 Unlock Terminal
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: INTERACTIVE LOW STOCK REVIEW & RESTOCK                              -->
+  <!-- ========================================================================= -->
+  <div id="modal-low-stock" class="modal-backdrop">
+    <div class="modal-card glass-panel" style="max-width: 720px; border-color: rgba(245, 158, 11, 0.5);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <h3 style="font-size: 18px; font-weight: 800; color: #ffffff;">⚠️ Low Stock Inventory Review</h3>
+          <span id="low-stock-modal-count" class="badge badge-warning">0 Items</span>
+        </div>
+        <button class="btn btn-sm btn-glass" onclick="closeLowStockModal()">✕</button>
+      </div>
+
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+        The products below have reached or fallen below their alert threshold. Click <strong>"➕ Restock Now"</strong> to
+        add inventory instantly.
+      </p>
+
+      <div style="max-height: 420px; overflow-y: auto;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+          <thead>
+            <tr
+              style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted); position: sticky; top: 0; background: var(--bg-dark);">
+              <th style="padding: 10px;">Barcode</th>
+              <th style="padding: 10px;">Product Name</th>
+              <th style="padding: 10px;">Category</th>
+              <th style="padding: 10px; text-align: center;">Current Stock</th>
+              <th style="padding: 10px; text-align: center;">Alert Level</th>
+              <th style="padding: 10px; text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody id="low-stock-modal-table-body">
+            <!-- Populated by pos.js -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: MANDATORY FIRST-LOGIN ADMIN ACCOUNT SECURITY                        -->
+  <!-- ========================================================================= -->
+  <div id="modal-secure-admin" class="modal-backdrop">
+    <div class="modal-card glass-panel"
+      style="max-width: 480px; border-color: rgba(16, 185, 129, 0.6); box-shadow: 0 10px 40px var(--emerald-glow);">
+      <div style="text-align: center; margin-bottom: 20px;">
+        <div
+          style="width: 56px; height: 56px; border-radius: 16px; background: rgba(16, 185, 129, 0.2); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; color: var(--emerald); font-size: 26px;">
+          🔐
+        </div>
+        <h3 style="font-size: 20px; font-weight: 800; color: #ffffff;">Secure Your Admin Account</h3>
+        <p style="font-size: 13px; color: var(--text-muted); margin-top: 6px; line-height: 1.5;">
+          This business terminal was registered with default credentials (<code
+            style="color:var(--emerald);">user / 123</code>).
+          For enterprise multi-tenant security, set your personal admin username and password before using the POS.
+        </p>
+      </div>
+
+      <form id="form-secure-admin" onsubmit="handleSecureAdminSubmit(event)" autocomplete="off">
+        <div class="form-group">
+          <label class="form-label">Admin Full Name</label>
+          <input type="text" id="secure-admin-fullname" class="form-control" placeholder="e.g. Prasanna Fernando"
+            required autocomplete="off">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">New Admin Username *</label>
+          <input type="text" id="secure-admin-username" class="form-control" placeholder="e.g. manager1 or admin"
+            required autocomplete="off">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">New Admin Password *</label>
+          <input type="password" id="secure-admin-password" class="form-control" placeholder="At least 4 characters"
+            required autocomplete="new-password">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Confirm New Password *</label>
+          <input type="password" id="secure-admin-confirm" class="form-control" placeholder="Re-type new password"
+            required autocomplete="new-password">
+        </div>
+
+        <button type="submit" class="btn btn-emerald btn-lg" style="width: 100%; margin-top: 10px; font-weight: 800;">
+          🛡️ Save Credentials & Open POS Station
+        </button>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: 4-STEP BUSINESS REGISTRATION WIZARD                                 -->
+  <!-- ========================================================================= -->
+  <div id="modal-register" class="modal-backdrop">
+    <div class="modal-card glass-panel" style="max-width: 540px; border-color: rgba(16, 185, 129, 0.4);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div>
+          <h3 style="font-size: 18px; font-weight: 800; color: #ffffff;">Register Your Business</h3>
+          <div style="font-size: 12px; color: var(--text-muted);">Step <span id="reg-step-number">1</span> of 4</div>
+        </div>
+        <button class="btn btn-sm btn-glass" onclick="closeRegistrationModal()">✕</button>
+      </div>
+
+      <!-- Step Indicator Bar -->
+      <div style="display: flex; gap: 6px; margin-bottom: 24px;">
+        <div id="reg-bar-1" style="flex: 1; height: 4px; border-radius: 2px; background: var(--emerald);"></div>
+        <div id="reg-bar-2" style="flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.1);"></div>
+        <div id="reg-bar-3" style="flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.1);"></div>
+        <div id="reg-bar-4" style="flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.1);"></div>
+      </div>
+
+      <!-- STEP 1: Email & Master Password with OTP -->
+      <div id="reg-step-1">
+        <div class="form-group">
+          <label class="form-label">Business Admin Email</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="email" id="reg-email" class="form-control" style="flex: 1;" placeholder="owner@myshop.lk"
+              required>
+            <button type="button" class="btn btn-cyan btn-sm" onclick="sendRegistrationOTP()">
+              Send OTP
+            </button>
+          </div>
+          <span style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">We'll send a 6-digit verification code
+            to this email.</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Set Business Master Password</label>
+          <input type="password" id="reg-master-password" class="form-control"
+            placeholder="Create a secure master password" required>
+        </div>
+
+        <div class="form-group" id="reg-otp-group"
+          style="display: none; background: rgba(16, 185, 129, 0.08); padding: 12px; border-radius: 10px; border: 1px solid var(--border-accent);">
+          <label class="form-label" style="color: var(--emerald);">Enter 6-Digit OTP Code</label>
+          <input type="text" id="reg-otp-code" class="form-control"
+            style="font-size: 20px; letter-spacing: 6px; text-align: center; font-family: var(--font-mono); font-weight: 700;"
+            maxlength="6" placeholder="123456">
+        </div>
+
+        <button type="button" class="btn btn-emerald btn-lg" style="width: 100%; margin-top: 14px;"
+          onclick="verifyOTPAndGoStep2()">
+          Verify & Continue ➔
+        </button>
+      </div>
+
+      <!-- STEP 2: Owner Personal Details -->
+      <div id="reg-step-2" style="display: none;">
+        <div class="form-group">
+          <label class="form-label">Owner Full Name</label>
+          <input type="text" id="reg-owner-name" class="form-control" placeholder="e.g. Prasanna Fernando" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Phone Number (Mobile / WhatsApp)</label>
+          <input type="tel" id="reg-phone" class="form-control" placeholder="e.g. +94 77 123 4567" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">NIC / Business Registration No (Optional)</label>
+          <input type="text" id="reg-nic" class="form-control" placeholder="e.g. 198512345678">
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 14px;">
+          <button type="button" class="btn btn-glass" onclick="goToRegStep(1)">Back</button>
+          <button type="button" class="btn btn-emerald btn-lg" style="flex: 1;" onclick="goToRegStep(3)">Next: Shop
+            Setup ➔</button>
+        </div>
+      </div>
+
+      <!-- STEP 3: Business & Bill Header Setup -->
+      <div id="reg-step-3" style="display: none;">
+        <div class="form-group">
+          <label class="form-label">Business / Shop Name *</label>
+          <input type="text" id="reg-shop-name" class="form-control" placeholder="e.g. Supiri Supermarket & Stores"
+            required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Full Address (Prints on every bill) *</label>
+          <textarea id="reg-address" class="form-control" rows="2" placeholder="e.g. No. 45/A, Galle Road, Colombo 03"
+            required></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Receipt Footer Message</label>
+          <input type="text" id="reg-receipt-footer" class="form-control"
+            value="Thank You! Come Again! / ස්තූතියි! නැවත එන්න!">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Upload Business Logo (Prints on thermal bills)</label>
+          <input type="file" id="reg-logo-file" accept="image/*" class="form-control"
+            onchange="handleLogoUpload(event)">
+          <div id="reg-logo-preview-box" style="margin-top: 8px; display: none;">
+            <img id="reg-logo-preview" src="" alt="Logo Preview"
+              style="height: 50px; border-radius: 6px; border: 1px solid var(--border-glass); padding: 4px; background: rgba(255,255,255,0.05);">
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 14px;">
+          <button type="button" class="btn btn-glass" onclick="goToRegStep(2)">Back</button>
+          <button type="button" class="btn btn-emerald btn-lg" style="flex: 1;"
+            onclick="completeBusinessRegistration()">🚀 Complete Registration</button>
+        </div>
+      </div>
+
+      <!-- STEP 4: Generated Credentials Card -->
+      <div id="reg-step-4" style="display: none;">
+        <div id="credentials-card-export"
+          style="background: linear-gradient(135deg, #0b1120 0%, #0f172a 100%); border: 2px solid var(--emerald); border-radius: 16px; padding: 24px; margin-bottom: 20px; box-shadow: 0 10px 30px var(--emerald-glow);">
+          <div
+            style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; border-bottom: 1px solid var(--border-glass); padding-bottom: 12px;">
+            <div>
+              <div style="font-size: 16px; font-weight: 800; color: #ffffff;" id="card-shop-name">My Shop</div>
+              <div style="font-size: 11px; color: var(--emerald); font-weight: 600;">SUPIRIPOS PRO CREDENTIALS</div>
+            </div>
+            <img src="/assets/logo.png" alt="Logo" style="height: 32px;">
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px;">
+            <div>
+              <div style="font-size: 11px; color: var(--text-muted);">ASSIGNED BUSINESS CODE</div>
+              <div id="card-business-code"
+                style="font-size: 24px; font-weight: 800; color: var(--cyan); font-family: var(--font-mono);">PT-00001
+              </div>
+            </div>
+            <div>
+              <div style="font-size: 11px; color: var(--text-muted);">MASTER PASSWORD</div>
+              <div id="card-master-password"
+                style="font-size: 16px; font-weight: 700; color: #ffffff; padding-top: 6px;">••••••••</div>
+            </div>
+          </div>
+
+          <div
+            style="background: rgba(255,255,255,0.04); padding: 12px; border-radius: 8px; border: 1px solid var(--border-glass);">
+            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">DEFAULT STAFF LOGIN (FULL
+              ACCESS):</div>
+            <div style="font-size: 14px; font-weight: 700; color: #ffffff; font-family: var(--font-mono);">
+              Username: <span style="color:var(--emerald);">user</span> | Password: <span
+                style="color:var(--emerald);">123</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+          <button type="button" class="btn btn-glass" style="flex: 1;" onclick="downloadCredentialsCard()">
+            ⬇️ Download Card (PNG)
+          </button>
+          <button type="button" class="btn btn-emerald btn-lg" style="flex: 1;" onclick="proceedToUnlockedTerminal()">
+            🔐 Proceed to Login
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: ADD / EDIT PRODUCT ITEM                                            -->
+  <!-- ========================================================================= -->
+  <div id="modal-item-form" class="modal-backdrop">
+    <div class="modal-card glass-panel" style="max-width: 520px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 id="item-form-title" style="font-size: 18px; font-weight: 800; color: #ffffff;">Add New Product</h3>
+        <button class="btn btn-sm btn-glass" onclick="closeItemModal()">✕</button>
+      </div>
+
+      <form id="form-item" onsubmit="handleSaveItem(event)">
+        <input type="hidden" id="item-form-id">
+
+        <div class="form-group">
+          <label class="form-label">Barcode / Item Code</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="item-form-code" class="form-control" style="flex: 1; font-family: var(--font-mono);"
+              placeholder="e.g. 4791234567890" required>
+            <button type="button" class="btn btn-sm btn-glass" onclick="generateRandomBarcode()">
+              🎲 Auto
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Product Name *</label>
+          <input type="text" id="item-form-name" class="form-control" placeholder="e.g. Keeri Samba Rice 5kg" required>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label">Category</label>
+            <input type="text" id="item-form-category" class="form-control" list="cat-suggestions"
+              placeholder="Groceries" required>
+            <datalist id="cat-suggestions">
+              <option value="Groceries">
+              <option value="Dairy">
+              <option value="Beverages">
+              <option value="Snacks">
+              <option value="Household">
+              <option value="Personal Care">
+              <option value="Apparel">
+            </datalist>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Unit of Measure</label>
+            <select id="item-form-unit" class="form-control">
+              <option value="Pcs">Pcs</option>
+              <option value="Kg">Kg</option>
+              <option value="Ltr">Ltr</option>
+              <option value="Box">Box</option>
+              <option value="Packet">Packet</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label">Cost Price (ගත් මිල - Rs.)</label>
+            <input type="number" id="item-form-cost" class="form-control" style="font-family: var(--font-mono);"
+              step="any" min="0" placeholder="0.00" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Selling Price (විකුණුම් මිල - Rs.) *</label>
+            <input type="number" id="item-form-price" class="form-control" style="font-family: var(--font-mono);"
+              step="any" min="0" placeholder="0.00" required>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group" id="item-initial-stock-group">
+            <label class="form-label">Initial Stock Qty</label>
+            <input type="number" id="item-form-stock" class="form-control" style="font-family: var(--font-mono);"
+              step="any" min="0" value="0">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Low Stock Alert Level</label>
+            <input type="number" id="item-form-low-alert" class="form-control" style="font-family: var(--font-mono);"
+              step="any" min="1" value="5">
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-emerald btn-lg" style="width: 100%; margin-top: 10px;">
+          Save Product
+        </button>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: ADD / EDIT STAFF USER & GRANULAR PERMISSIONS                       -->
+  <!-- ========================================================================= -->
+  <div id="modal-user-form" class="modal-backdrop">
+    <div class="modal-card glass-panel" style="max-width: 480px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 id="user-form-title" style="font-size: 18px; font-weight: 800; color: #ffffff;">Add Staff User</h3>
+        <button class="btn btn-sm btn-glass" onclick="closeUserModal()">✕</button>
+      </div>
+
+      <form id="form-user" onsubmit="handleSaveUser(event)">
+        <input type="hidden" id="user-form-id">
+
+        <div class="form-group">
+          <label class="form-label">Full Name *</label>
+          <input type="text" id="user-form-fullname" class="form-control" placeholder="e.g. Kasun Perera" required>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label">Username *</label>
+            <input type="text" id="user-form-username" class="form-control" placeholder="e.g. cashier1" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Role Title</label>
+            <input type="text" id="user-form-role" class="form-control" placeholder="e.g. Cashier" value="Cashier"
+              required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Password <span id="user-pw-hint"
+              style="font-size: 11px; color: var(--text-dim);">(leave blank to keep unchanged)</span></label>
+          <input type="password" id="user-form-password" class="form-control" placeholder="••••••••">
+        </div>
+
+        <!-- Granular Permissions Checkboxes -->
+        <div
+          style="background: rgba(255,255,255,0.03); padding: 14px; border-radius: 10px; border: 1px solid var(--border-glass); margin-bottom: 16px;">
+          <label class="form-label" style="margin-bottom: 10px; display: block; color: var(--cyan);">Granular Page
+            Access Control:</label>
+          <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="perm-billing" checked> 🛒 Billing Page (Cashier Terminal)
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="perm-items" checked> 📦 Items Page (Product Catalog)
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="perm-stock" checked> 📊 Stock Manage Page (Inventory Control)
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="perm-users"> 👥 Users Page (Staff Accounts)
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="perm-reports"> 📈 Reports Page (Sales & Profit)
+            </label>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-emerald btn-lg" style="width: 100%;">
+          Save Staff Account
+        </button>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: RECALL HELD BILLS                                                   -->
+  <!-- ========================================================================= -->
+  <div id="modal-held-bills" class="modal-backdrop">
+    <div class="modal-card glass-panel" style="max-width: 480px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="font-size: 18px; font-weight: 800; color: #ffffff;">Recall Held Bills</h3>
+        <button class="btn btn-sm btn-glass" onclick="closeRecallBillsModal()">✕</button>
+      </div>
+      <div id="held-bills-list"
+        style="display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto;">
+        <!-- Populated by pos.js -->
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: PRINTABLE RECEIPT & INVOICE VIEWER                                  -->
+  <!-- ========================================================================= -->
+  <div id="modal-receipt" class="modal-backdrop">
+    <div class="modal-card glass-panel" style="max-width: 420px; padding: 20px;">
+
+      <!-- Receipt Format Toggle & Close -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+        <div style="display: flex; gap: 6px;">
+          <button class="btn btn-sm btn-cyan receipt-format-btn" onclick="switchReceiptFormat('80mm')">80mm POS</button>
+          <button class="btn btn-sm btn-glass receipt-format-btn" onclick="switchReceiptFormat('58mm')">58mm
+            POS</button>
+        </div>
+        <button class="btn btn-sm btn-glass" onclick="closeReceiptModal()">✕</button>
+      </div>
+
+      <!-- Live Receipt Paper Simulation Preview -->
+      <div id="thermal-receipt-preview"
+        style="background: #ffffff; color: #000000; font-family: 'Courier New', Courier, monospace; padding: 18px; border-radius: 8px; font-size: 12px; line-height: 1.4; box-shadow: 0 4px 15px rgba(0,0,0,0.5); max-height: 60vh; overflow-y: auto;">
+        <!-- Dynamically rendered by pos.js -->
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-top: 16px;">
+        <button class="btn btn-emerald btn-lg" style="flex: 1;" onclick="triggerThermalPrint()">
+          🖨️ Print Receipt
+        </button>
+        <button class="btn btn-glass" onclick="closeReceiptModal()">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: BILINGUAL USER GUIDE (ENGLISH / සිංහල)                               -->
+  <!-- ========================================================================= -->
+  <div id="modal-user-guide" class="modal-backdrop">
+    <div class="modal-card glass-panel" style="max-width: 720px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <h3 style="font-size: 20px; font-weight: 800; color: #ffffff;">SupiriPOS PRO User Guide</h3>
+          <div style="display: flex; gap: 6px;">
+            <button id="guide-lang-en" class="btn btn-sm btn-cyan" onclick="switchGuideLang('en')">English</button>
+            <button id="guide-lang-si" class="btn btn-sm btn-glass" onclick="switchGuideLang('si')">සිංහල</button>
+          </div>
+        </div>
+        <button class="btn btn-sm btn-glass" onclick="closeUserGuideModal()">✕</button>
+      </div>
+
+      <!-- English Guide Section -->
+      <div id="guide-content-en"
+        style="font-size: 14px; line-height: 1.6; color: var(--text-muted); max-height: 65vh; overflow-y: auto; padding-right: 8px;">
+        <h4 style="color: var(--emerald); font-size: 16px; margin: 12px 0 6px 0;">1. 3 Landing Gateways</h4>
+        <p>• <strong>Launch Instant Demo Shop:</strong> 1-click test of pre-populated Colombo Supermarket
+          (<code>PT-DEMO</code>).<br>
+          • <strong>Register Business:</strong> 4-step wizard to register your shop, upload your receipt logo, and get
+          your unique Business Code (e.g. <code>PT-00001</code>).<br>
+          • <strong>Terminal Unlock:</strong> Locks this terminal station to your business code.</p>
+
+        <h4 style="color: var(--emerald); font-size: 16px; margin: 16px 0 6px 0;">2. Two-Stage Login Security</h4>
+        <p>• <strong>Stage 1 (Terminal Unlock):</strong> Business Code + Business Master Password.<br>
+          • <strong>Stage 2 (POS Staff Login):</strong> Default username <code>user</code>, password <code>123</code>.
+          Displays your shop logo and business badge.</p>
+
+        <h4 style="color: var(--emerald); font-size: 16px; margin: 16px 0 6px 0;">3. Fast Cashier Billing & Printing
+        </h4>
+        <p>• Scan barcodes with any USB/Bluetooth barcode scanner; pressing Enter automatically adds the item to the
+          active bill.<br>
+          • Use quick cash tender buttons (<code>+500</code>, <code>+1,000</code>, <code>+5,000</code>,
+          <code>Exact</code>) to instantly calculate Change Due (ඉතුරු මුදල).<br>
+          • Complete sale triggers thermal receipt print (80mm / 58mm) and deducts inventory in real time across all
+          counters.</p>
+
+        <h4 style="color: var(--emerald); font-size: 16px; margin: 16px 0 6px 0;">4. Real-Time Multi-Device Sync</h4>
+        <p>• Connected via WebSockets. When Cashier 1 makes a sale or adjusts stock, Counter 2 and Counter 3
+          automatically update without refreshing!</p>
+      </div>
+
+      <!-- Sinhala Guide Section -->
+      <div id="guide-content-si"
+        style="display: none; font-size: 14px; line-height: 1.8; color: var(--text-muted); max-height: 65vh; overflow-y: auto; padding-right: 8px;">
+        <h4 style="color: var(--cyan); font-size: 16px; margin: 12px 0 6px 0;">1. පද්ධතියට පිවිසීමේ ක්‍රම 3</h4>
+        <p>• <strong>Live Demo මඟින් පරීක්ෂා කිරීම:</strong> ලියාපදිංචි නොවී තත්පරයකින් <code>PT-DEMO</code> සුපිරි
+          වෙළඳසැලට පිවිස බිල්පත් නිකුත් කිරීම සහ වාර්තා බලන්න.<br>
+          • <strong>නව ව්‍යාපාරයක් ලියාපදිංචි කිරීම:</strong> පියවර 4 කින් ඔබේ ව්‍යාපාරය ඇතුළත් කර අද්විතීය ව්‍යාපාර
+          කේතය (<code>PT-00001</code>) ලබා ගන්න.<br>
+          • <strong>ව්‍යාපාරයට පිවිසීම (Terminal Unlock):</strong> ඔබේ ව්‍යාපාර කේතය සහ මුරපදය මඟින් පරිගණකය ලොක්
+          කරගන්න.</p>
+
+        <h4 style="color: var(--cyan); font-size: 16px; margin: 16px 0 6px 0;">2. මුදල් අයකැමි පිවිසුම (Staff Login)
+        </h4>
+        <p>• ඔබේ ව්‍යාපාරය ලියාපදිංචි කළ පසු ප්‍රධාන මුදල් අයකැමි පිවිසුම වන්නේ <strong>Username:
+            <code>user</code></strong> සහ <strong>Password: <code>123</code></strong> වේ.<br>
+          • ඔබගේ කාර්ය මණ්ඩලයට අවශ්‍ය පරිදි වෙනම Cashier ගිණුම් සාදා ඔවුන්ට අදාළ පිටු පමණක් ලබා දිය හැක.</p>
+
+        <h4 style="color: var(--cyan); font-size: 16px; margin: 16px 0 6px 0;">3. බිල්පත් මුද්‍රණය සහ තොග කළමනාකරණය</h4>
+        <p>• Barcode ස්කෑන් කළ සැණින් භාණ්ඩ බිලට එක් වේ. මුදල් ලැබුණු පසු ඉතුරු මුදල පැහැදිලිව පෙන්වයි.<br>
+          • 80mm සහ 58mm Thermal මුද්‍රණ යන්ත්‍ර මඟින් සිංහල අකුරු සහිත අලංකාර බිල්පතක් ක්ෂණිකව මුද්‍රණය වේ.<br>
+          • කවුන්ටර කිහිපයකින් එකවර බිල් දැමුවද WebSockets හරහා සියලු තොග තොරතුරු ක්ෂණිකව සමමුහුර්ත (Real-Time Sync) වේ.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden Print Container for Direct Browser Printing -->
+  <div id="printable-receipt-container"></div>
+
+  <!-- Main POS Client-Side Controller -->
+  <script src="/assets/pos.js?v=20261030_status"></script>
+</body>
+
+</html>
