@@ -1360,19 +1360,20 @@ async def create_invoice(req: CreateInvoiceRequest, db: Session = Depends(get_db
                 "total": cart_it.total
             })
 
+    staff_ident = (req.cashier_username or "Admin").strip() or "Admin"
     invoice = Invoice(
         business_code=req.business_code,
         invoice_number=inv_number,
         date_time=datetime.now(timezone.utc),
-        cashier_username=req.cashier_username,
-        payment_method=req.payment_method,
-        subtotal=req.subtotal,
-        discount_amount=req.discount_amount,
-        discount_percent=req.discount_percent,
-        tax_amount=req.tax_amount,
-        grand_total=req.grand_total,
-        cash_paid=req.cash_paid,
-        balance_change=req.balance_change,
+        cashier_username=staff_ident,
+        payment_method=req.payment_method or "Cash",
+        subtotal=float(req.subtotal or 0.0),
+        discount_amount=float(req.discount_amount or 0.0),
+        discount_percent=float(req.discount_percent or 0.0),
+        tax_amount=float(req.tax_amount or 0.0),
+        grand_total=float(req.grand_total or 0.0),
+        cash_paid=float(req.cash_paid or 0.0),
+        balance_change=float(req.balance_change or 0.0),
         customer_name=req.customer_name or "",
         customer_phone=req.customer_phone or "",
         status="PAID",
@@ -1390,21 +1391,27 @@ async def create_invoice(req: CreateInvoiceRequest, db: Session = Depends(get_db
         "grand_total": invoice.grand_total
     })
 
-    log_activity(db, req.business_code, req.cashier_username, "BILL_CREATED",
+    log_activity(db, req.business_code, staff_ident, "BILL_CREATED",
                  f"Created Invoice #{inv_number} ({req.payment_method}) - Total: Rs. {req.grand_total:.2f}")
 
     return {
         "success": True,
+        "id": invoice.id,
         "invoice_id": invoice.id,
         "invoice_number": invoice.invoice_number,
         "date_time": invoice.date_time.isoformat(),
-        "cashier_username": invoice.cashier_username,
+        "cashier_username": staff_ident,
+        "staff_username": staff_ident,
+        "staff_name": staff_ident,
+        "cashier_name": staff_ident,
         "payment_method": invoice.payment_method,
-        "subtotal": invoice.subtotal,
-        "discount_amount": invoice.discount_amount,
-        "grand_total": invoice.grand_total,
-        "cash_paid": invoice.cash_paid,
-        "balance_change": invoice.balance_change,
+        "subtotal": float(invoice.subtotal or 0.0),
+        "discount_amount": float(invoice.discount_amount or 0.0),
+        "tax_amount": float(invoice.tax_amount or 0.0),
+        "grand_total": float(invoice.grand_total or 0.0),
+        "cash_paid": float(invoice.cash_paid or 0.0),
+        "balance_change": float(invoice.balance_change or 0.0),
+        "status": invoice.status,
         "items": processed_items
     }
 
@@ -1440,28 +1447,66 @@ def get_invoices(
         except Exception:
             pass
 
-    invoices = query.order_by(desc(Invoice.date_time)).limit(200).all()
+    invoices = query.order_by(desc(Invoice.date_time)).limit(500).all()
+
+    # Map usernames to full display names if available
+    users = db.query(POSUser).filter(POSUser.business_code == business_code).all()
+    user_display_map = {}
+    for u in users:
+        if u.username:
+            user_display_map[u.username.lower()] = u.full_name or u.username
 
     result = []
     for inv in invoices:
         items = []
+        est_cost = 0.0
+        total_qty = 0.0
         try:
             items = json.loads(inv.items_json)
+            for it in items:
+                q = float(it.get("quantity") or 0.0)
+                c = float(it.get("cost_price") or 0.0)
+                est_cost += c * q
+                total_qty += q
         except Exception:
             pass
+
+        raw_staff = (inv.cashier_username or "").strip()
+        if not raw_staff or raw_staff.lower() in ("undefined", "null", "none"):
+            raw_staff = "Admin"
+        display_staff = user_display_map.get(raw_staff.lower(), raw_staff)
+
+        grand_tot = float(inv.grand_total or 0.0)
+        sub_tot = float(inv.subtotal or grand_tot)
+        disc_amt = float(inv.discount_amount or 0.0)
+        tax_amt = float(inv.tax_amount or 0.0)
+        est_profit = max(0.0, grand_tot - est_cost) if inv.status == "PAID" else 0.0
+
         result.append({
             "id": inv.id,
             "invoice_number": inv.invoice_number,
-            "date_time": inv.date_time.isoformat(),
-            "cashier_username": inv.cashier_username,
-            "payment_method": inv.payment_method,
-            "subtotal": inv.subtotal,
-            "discount_amount": inv.discount_amount,
-            "grand_total": inv.grand_total,
-            "cash_paid": inv.cash_paid,
-            "balance_change": inv.balance_change,
-            "status": inv.status,
+            "date_time": inv.date_time.isoformat() if inv.date_time else "",
+            "cashier_username": raw_staff,
+            "staff_username": raw_staff,
+            "staff_name": display_staff,
+            "cashier_name": display_staff,
+            "user_name": raw_staff,
+            "cashier": display_staff,
+            "created_by": raw_staff,
+            "customer_name": inv.customer_name or "Walk-in Customer",
+            "customer_phone": inv.customer_phone or "",
+            "payment_method": inv.payment_method or "Cash",
+            "subtotal": round(sub_tot, 2),
+            "discount_amount": round(disc_amt, 2),
+            "tax_amount": round(tax_amt, 2),
+            "grand_total": round(grand_tot, 2),
+            "cash_paid": round(float(inv.cash_paid or grand_tot), 2),
+            "balance_change": round(float(inv.balance_change or 0.0), 2),
+            "estimated_cost": round(est_cost, 2),
+            "estimated_profit": round(est_profit, 2),
+            "status": inv.status or "PAID",
             "items_count": len(items),
+            "total_quantity": round(total_qty, 2),
             "items": items
         })
     return result
@@ -1557,18 +1602,22 @@ def get_reports_summary(
 
     total_sales = 0.0
     total_cost = 0.0
+    total_discounts = 0.0
     total_bills = len(invoices)
 
     for inv in invoices:
-        total_sales += inv.grand_total
+        total_sales += float(inv.grand_total or 0.0)
+        total_discounts += float(inv.discount_amount or 0.0)
         try:
             items = json.loads(inv.items_json)
             for it in items:
-                total_cost += float(it.get("cost_price", 0.0)) * float(it.get("quantity", 1.0))
+                total_cost += float(it.get("cost_price") or 0.0) * float(it.get("quantity") or 1.0)
+                total_discounts += float(it.get("discount") or 0.0)
         except Exception:
             pass
 
     net_profit = max(0.0, total_sales - total_cost)
+    avg_bill_value = (total_sales / total_bills) if total_bills > 0 else 0.0
 
     # Low stock items count for this business
     low_stock_count = db.query(Item).filter(
@@ -1580,6 +1629,8 @@ def get_reports_summary(
         "total_sales": round(total_sales, 2),
         "net_profit": round(net_profit, 2),
         "total_bills": total_bills,
+        "avg_bill_value": round(avg_bill_value, 2),
+        "total_discounts": round(total_discounts, 2),
         "low_stock_items": low_stock_count
     }
 
@@ -1595,16 +1646,17 @@ def export_reports_csv(
     invoices_data = get_invoices(business_code, range, start_date, end_date, db)
 
     csv_lines = [
-        "Invoice Number,Date Time,Cashier,Payment Method,Subtotal (Rs.),Discount (Rs.),Grand Total (Rs.),Status,Items Count\n"
+        "\ufeffInvoice Number,Date Time,Staff Member,Payment Method,Subtotal (Rs.),Discount (Rs.),Grand Total (Rs.),Est. Profit (Rs.),Status,Items Count\n"
     ]
     for inv in invoices_data:
-        line = f'"{inv["invoice_number"]}","{inv["date_time"]}","{inv["cashier_username"]}","{inv["payment_method"]}",{inv["subtotal"]},{inv["discount_amount"]},{inv["grand_total"]},"{inv["status"]}",{inv["items_count"]}\n'
+        staff_val = inv.get("staff_name") or inv.get("cashier_username") or "Admin"
+        line = f'"{inv["invoice_number"]}","{inv["date_time"]}","{staff_val}","{inv["payment_method"]}",{inv["subtotal"]},{inv["discount_amount"]},{inv["grand_total"]},{inv.get("estimated_profit", 0.0)},"{inv["status"]}",{inv["items_count"]}\n'
         csv_lines.append(line)
 
     csv_data = "".join(csv_lines)
     return Response(
         content=csv_data,
-        media_type="text/csv",
+        media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f"attachment; filename=SupiriPOS_Report_{business_code}_{range}.csv"}
     )
 
@@ -1901,9 +1953,13 @@ def get_bin_card(
 
     movements = []
     for l in logs:
-        change = l.quantity_change
+        change = float(l.quantity_change or 0.0)
         qty_in = change if change > 0 else 0.0
         qty_out = abs(change) if change < 0 else 0.0
+        staff_val = (l.staff_username or "").strip()
+        if not staff_val or staff_val.lower() in ("undefined", "null", "none"):
+            staff_val = "System User"
+        new_stk = float(l.new_stock or 0.0)
         movements.append({
             "id": l.id,
             "created_at": l.created_at.isoformat() if l.created_at else "",
@@ -1911,9 +1967,12 @@ def get_bin_card(
             "reference": l.note or "-",
             "qty_in": qty_in,
             "qty_out": qty_out,
-            "previous_stock": l.previous_stock,
-            "new_stock": l.new_stock,
-            "staff_username": l.staff_username or "System"
+            "previous_stock": float(l.previous_stock or 0.0),
+            "new_stock": new_stk,
+            "running_balance": new_stk,
+            "staff_username": staff_val,
+            "staff_name": staff_val,
+            "username": staff_val
         })
 
     return {
@@ -1935,6 +1994,7 @@ def get_bin_card(
 def get_activity_logs(
     business_code: str,
     username: Optional[str] = None,
+    staff_username: Optional[str] = None,
     action_type: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
@@ -1944,8 +2004,9 @@ def get_activity_logs(
     """Fetches staff audit logs with granular user and action filters"""
     query = db.query(ActivityLog).filter(ActivityLog.business_code == business_code)
 
-    if username and username.upper() != "ALL":
-        query = query.filter(ActivityLog.username == username.strip().lower())
+    target_user = staff_username or username
+    if target_user and target_user.upper() != "ALL":
+        query = query.filter(ActivityLog.username.ilike(target_user.strip()))
 
     if action_type and action_type.upper() != "ALL":
         query = query.filter(ActivityLog.action_type == action_type.strip().upper())
@@ -1965,13 +2026,23 @@ def get_activity_logs(
 
     logs = query.order_by(desc(ActivityLog.created_at)).limit(limit).all()
 
-    return [{
-        "id": l.id,
-        "username": l.username,
-        "action_type": l.action_type,
-        "details": l.details,
-        "created_at": l.created_at.isoformat() if l.created_at else ""
-    } for l in logs]
+    result = []
+    for l in logs:
+        staff_val = (l.username or "").strip()
+        if not staff_val or staff_val.lower() in ("undefined", "null", "none"):
+            staff_val = "System User"
+        result.append({
+            "id": l.id,
+            "username": staff_val,
+            "staff_username": staff_val,
+            "staff_name": staff_val,
+            "user_name": staff_val,
+            "created_by": staff_val,
+            "action_type": l.action_type or "SYSTEM",
+            "details": l.details or "-",
+            "created_at": l.created_at.isoformat() if l.created_at else ""
+        })
+    return result
 
 # ---------------------------------------------------------------------------
 # Static Assets & Single Page Application Serving
