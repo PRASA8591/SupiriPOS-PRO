@@ -334,6 +334,31 @@ class OTPVerification(Base):
     is_verified = Column(Boolean, default=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
+class CreditCustomer(Base):
+    __tablename__ = "credit_customers"
+    id = Column(Integer, primary_key=True, index=True)
+    business_code = Column(String(30), index=True, nullable=False)
+    phone = Column(String(50), index=True, nullable=False)
+    name = Column(String(150), nullable=False)
+    address = Column(Text, default="")
+    credit_balance = Column(Float, default=0.0)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+class CreditLedger(Base):
+    __tablename__ = "credit_ledger"
+    id = Column(Integer, primary_key=True, index=True)
+    business_code = Column(String(30), index=True, nullable=False)
+    customer_id = Column(Integer, index=True, nullable=False)
+    customer_phone = Column(String(50), index=True, nullable=False)
+    transaction_type = Column(String(40), index=True, nullable=False)  # CREDIT_SALE or PAYMENT_RECEIVED
+    amount = Column(Float, default=0.0)
+    balance_after = Column(Float, default=0.0)
+    payment_method = Column(String(50), default="Cash")  # Cash, Card, Bank/QR, Invoice
+    reference_note = Column(Text, default="")
+    staff_user = Column(String(100), default="Admin")
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+
 # Create tables & perform safe migrations
 try:
     Base.metadata.create_all(bind=engine)
@@ -579,6 +604,86 @@ def seed_demo_supermarket(db: Session):
         db.commit()
         logger.info("[SEED] Demo Supermarket PT-DEMO seeded successfully!")
 
+    # Seed sample Credit Customers for PT-DEMO if none exist yet
+    try:
+        existing_cust_count = db.query(CreditCustomer).filter(CreditCustomer.business_code == "PT-DEMO").count()
+        if existing_cust_count == 0:
+            now_dt = datetime.now(timezone.utc)
+            c1 = CreditCustomer(
+                business_code="PT-DEMO",
+                phone="0771234567",
+                name="Nimal Perera",
+                address="No. 18, Temple Road, Mount Lavinia",
+                credit_balance=2450.0,
+                created_at=now_dt - timedelta(days=5),
+                updated_at=now_dt - timedelta(days=1)
+            )
+            c2 = CreditCustomer(
+                business_code="PT-DEMO",
+                phone="0719876543",
+                name="Kamani Jayawardena",
+                address="42/B, Station Road, Dehiwala",
+                credit_balance=1350.0,
+                created_at=now_dt - timedelta(days=3),
+                updated_at=now_dt - timedelta(hours=6)
+            )
+            c3 = CreditCustomer(
+                business_code="PT-DEMO",
+                phone="0765554433",
+                name="Ruwan Bandara",
+                address="No. 9, High Level Road, Nugegoda",
+                credit_balance=0.0,
+                created_at=now_dt - timedelta(days=7),
+                updated_at=now_dt - timedelta(days=2)
+            )
+            db.add_all([c1, c2, c3])
+            db.commit()
+            db.refresh(c1)
+            db.refresh(c2)
+            db.refresh(c3)
+
+            db.add_all([
+                CreditLedger(
+                    business_code="PT-DEMO",
+                    customer_id=c1.id,
+                    customer_phone=c1.phone,
+                    transaction_type="CREDIT_SALE",
+                    amount=3450.0,
+                    balance_after=3450.0,
+                    payment_method="Invoice",
+                    reference_note="Credit Bill #INV-PT-DEMO-CR01",
+                    staff_user="Supiri Admin",
+                    created_at=now_dt - timedelta(days=2)
+                ),
+                CreditLedger(
+                    business_code="PT-DEMO",
+                    customer_id=c1.id,
+                    customer_phone=c1.phone,
+                    transaction_type="PAYMENT_RECEIVED",
+                    amount=1000.0,
+                    balance_after=2450.0,
+                    payment_method="Cash",
+                    reference_note="Partial Cash Settlement",
+                    staff_user="Supiri Admin",
+                    created_at=now_dt - timedelta(hours=3)
+                ),
+                CreditLedger(
+                    business_code="PT-DEMO",
+                    customer_id=c2.id,
+                    customer_phone=c2.phone,
+                    transaction_type="CREDIT_SALE",
+                    amount=1350.0,
+                    balance_after=1350.0,
+                    payment_method="Invoice",
+                    reference_note="Credit Bill #INV-PT-DEMO-CR02",
+                    staff_user="Supiri Admin",
+                    created_at=now_dt - timedelta(hours=6)
+                )
+            ])
+            db.commit()
+    except Exception as seed_cr_err:
+        logger.warning(f"[SEED CREDIT] {seed_cr_err}")
+
 # Initialize Demo Shop in DB
 with SessionLocal() as db_session:
     seed_demo_supermarket(db_session)
@@ -692,9 +797,26 @@ class CreateInvoiceRequest(BaseModel):
     grand_total: float
     cash_paid: float
     balance_change: float
+    customer_id: Optional[int] = None
     customer_name: Optional[str] = ""
     customer_phone: Optional[str] = ""
+    customer_address: Optional[str] = ""
     items: List[CartItemModel]
+
+class CreateCreditCustomerRequest(BaseModel):
+    business_code: str
+    phone: str
+    name: str
+    address: Optional[str] = ""
+    staff_user: Optional[str] = "Admin"
+
+class PayCreditRequest(BaseModel):
+    business_code: str
+    customer_id: int
+    amount_paid: float
+    payment_method: str = "Cash"
+    note: Optional[str] = ""
+    staff_user: Optional[str] = "Admin"
 
 class UserCreateUpdateRequest(BaseModel):
     business_code: str
@@ -767,19 +889,89 @@ async def websocket_endpoint(websocket: WebSocket, business_code: str):
         logger.error(f"[WS ERROR] {e}")
         ws_manager.disconnect(websocket, business_code)
 
+def _normalize_phone(phone_str: str) -> str:
+    """Normalize phone number for fast matching while preserving original formatting"""
+    if not phone_str:
+        return ""
+    digits = "".join(ch for ch in str(phone_str) if ch.isdigit())
+    # Normalize +9477... -> 077... for Sri Lankan numbers
+    if digits.startswith("94") and len(digits) == 11:
+        digits = "0" + digits[2:]
+    return digits or str(phone_str).strip()
+
+def _build_credit_customers_payload(db: Session, business_code: str):
+    customers = db.query(CreditCustomer).filter(
+        CreditCustomer.business_code == business_code
+    ).order_by(desc(CreditCustomer.credit_balance), CreditCustomer.name.asc()).all()
+
+    recent_ledger = db.query(CreditLedger).filter(
+        CreditLedger.business_code == business_code
+    ).order_by(desc(CreditLedger.created_at)).limit(100).all()
+
+    # Map customer_id -> latest ledger entry
+    last_tx_map = {}
+    for entry in recent_ledger:
+        if entry.customer_id not in last_tx_map:
+            last_tx_map[entry.customer_id] = {
+                "id": entry.id,
+                "transaction_type": entry.transaction_type,
+                "amount": round(float(entry.amount or 0.0), 2),
+                "balance_after": round(float(entry.balance_after or 0.0), 2),
+                "payment_method": entry.payment_method or "Cash",
+                "reference_note": entry.reference_note or "",
+                "staff_user": entry.staff_user or "Admin",
+                "created_at": entry.created_at.isoformat() if entry.created_at else ""
+            }
+
+    customers_list = []
+    for c in customers:
+        last_tx = last_tx_map.get(c.id)
+        customers_list.append({
+            "id": c.id,
+            "business_code": c.business_code,
+            "phone": c.phone,
+            "phone_normalized": _normalize_phone(c.phone),
+            "name": c.name,
+            "address": c.address or "",
+            "credit_balance": round(float(c.credit_balance or 0.0), 2),
+            "created_at": c.created_at.isoformat() if c.created_at else "",
+            "updated_at": c.updated_at.isoformat() if c.updated_at else "",
+            "last_transaction": last_tx
+        })
+
+    ledger_list = [{
+        "id": l.id,
+        "business_code": l.business_code,
+        "customer_id": l.customer_id,
+        "customer_phone": l.customer_phone,
+        "transaction_type": l.transaction_type,
+        "amount": round(float(l.amount or 0.0), 2),
+        "balance_after": round(float(l.balance_after or 0.0), 2),
+        "payment_method": l.payment_method or "Cash",
+        "reference_note": l.reference_note or "",
+        "staff_user": l.staff_user or "Admin",
+        "created_at": l.created_at.isoformat() if l.created_at else ""
+    } for l in recent_ledger]
+
+    return customers_list, ledger_list
+
 @app.get("/api/sync/state")
 def get_sync_state(business_code: str, db: Session = Depends(get_db)):
-    """Fast polling fallback with delta state tracking"""
+    """Fast polling fallback with delta state tracking + instant credit customer cache"""
     items_count = db.query(Item).filter(Item.business_code == business_code).count()
     invoices_count = db.query(Invoice).filter(Invoice.business_code == business_code).count()
+    ledger_count = db.query(CreditLedger).filter(CreditLedger.business_code == business_code).count()
+    customers_list, ledger_list = _build_credit_customers_payload(db, business_code)
     version_num = ws_manager.business_version.get(business_code, 1)
-    state_ver = f"v{version_num}_i{items_count}_inv{invoices_count}"
+    state_ver = f"v{version_num}_i{items_count}_inv{invoices_count}_cr{len(customers_list)}_lg{ledger_count}"
     return {
         "business_code": business_code,
         "version": version_num,
         "state_version": state_ver,
         "items_count": items_count,
         "invoices_count": invoices_count,
+        "credit_customers": customers_list,
+        "credit_ledger": ledger_list,
         "server_time": datetime.now(timezone.utc).isoformat()
     }
 
@@ -1312,12 +1504,306 @@ def get_stock_logs(business_code: str, limit: int = 50, db: Session = Depends(ge
     return logs
 
 # ---------------------------------------------------------------------------
-# Invoices & Billing (Real-Time Stock Deduction & Reprinting)
+# Credit Customers & Repayment Ledger Endpoints ("ණයට" & Settlements)
+# ---------------------------------------------------------------------------
+@app.get("/api/customers")
+def get_credit_customers(business_code: str, db: Session = Depends(get_db)):
+    customers_list, ledger_list = _build_credit_customers_payload(db, business_code)
+
+    total_outstanding = sum(float(c["credit_balance"] or 0.0) for c in customers_list)
+    active_count = sum(1 for c in customers_list if float(c["credit_balance"] or 0.0) > 0)
+
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_payments = db.query(CreditLedger).filter(
+        CreditLedger.business_code == business_code,
+        CreditLedger.transaction_type == "PAYMENT_RECEIVED",
+        CreditLedger.created_at >= today_start
+    ).all()
+    collected_today = sum(float(p.amount or 0.0) for p in today_payments)
+
+    return {
+        "customers": customers_list,
+        "recent_ledger": ledger_list,
+        "summary": {
+            "total_outstanding_credit": round(total_outstanding, 2),
+            "active_credit_customers": active_count,
+            "total_customers": len(customers_list),
+            "credit_collected_today": round(collected_today, 2)
+        }
+    }
+
+@app.get("/api/customers/lookup")
+def lookup_credit_customer(business_code: str, phone: str = "", db: Session = Depends(get_db)):
+    clean_phone = (phone or "").strip()
+    norm_target = _normalize_phone(clean_phone)
+    if not clean_phone:
+        return {"found": False, "customer": None}
+
+    customers = db.query(CreditCustomer).filter(CreditCustomer.business_code == business_code).all()
+    matched = None
+    for c in customers:
+        if c.phone.strip() == clean_phone or (_normalize_phone(c.phone) == norm_target and len(norm_target) >= 7):
+            matched = c
+            break
+
+    if not matched:
+        return {"found": False, "customer": None}
+
+    return {
+        "found": True,
+        "customer": {
+            "id": matched.id,
+            "business_code": matched.business_code,
+            "phone": matched.phone,
+            "phone_normalized": _normalize_phone(matched.phone),
+            "name": matched.name,
+            "address": matched.address or "",
+            "credit_balance": round(float(matched.credit_balance or 0.0), 2),
+            "created_at": matched.created_at.isoformat() if matched.created_at else "",
+            "updated_at": matched.updated_at.isoformat() if matched.updated_at else ""
+        }
+    }
+
+@app.post("/api/customers/create")
+async def create_credit_customer(req: CreateCreditCustomerRequest, db: Session = Depends(get_db)):
+    phone_clean = (req.phone or "").strip()
+    name_clean = (req.name or "").strip()
+    addr_clean = (req.address or "").strip()
+    staff_ident = (req.staff_user or "Admin").strip() or "Admin"
+
+    if not phone_clean:
+        raise HTTPException(status_code=400, detail="Customer mobile number is required.")
+    if not name_clean:
+        raise HTTPException(status_code=400, detail="Customer name is required.")
+
+    norm_target = _normalize_phone(phone_clean)
+    existing_all = db.query(CreditCustomer).filter(CreditCustomer.business_code == req.business_code).all()
+    for c in existing_all:
+        if c.phone.strip() == phone_clean or (norm_target and _normalize_phone(c.phone) == norm_target):
+            # Update name/address if provided and return existing customer
+            c.name = name_clean
+            if addr_clean:
+                c.address = addr_clean
+            c.updated_at = datetime.now(timezone.utc)
+            db.commit()
+            db.refresh(c)
+            return {
+                "success": True,
+                "already_existed": True,
+                "customer": {
+                    "id": c.id,
+                    "business_code": c.business_code,
+                    "phone": c.phone,
+                    "phone_normalized": _normalize_phone(c.phone),
+                    "name": c.name,
+                    "address": c.address or "",
+                    "credit_balance": round(float(c.credit_balance or 0.0), 2),
+                    "created_at": c.created_at.isoformat() if c.created_at else "",
+                    "updated_at": c.updated_at.isoformat() if c.updated_at else ""
+                }
+            }
+
+    new_cust = CreditCustomer(
+        business_code=req.business_code,
+        phone=phone_clean,
+        name=name_clean,
+        address=addr_clean,
+        credit_balance=0.0,
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc)
+    )
+    db.add(new_cust)
+    db.commit()
+    db.refresh(new_cust)
+
+    log_activity(
+        db,
+        req.business_code,
+        staff_ident,
+        "CUSTOMER_CREATED",
+        f"Registered credit customer '{new_cust.name}' ({new_cust.phone}) - {new_cust.address or 'No address'}"
+    )
+
+    await ws_manager.broadcast(req.business_code, {
+        "type": "CREDIT_UPDATED",
+        "action": "CUSTOMER_CREATED",
+        "customer_id": new_cust.id
+    })
+
+    return {
+        "success": True,
+        "customer": {
+            "id": new_cust.id,
+            "business_code": new_cust.business_code,
+            "phone": new_cust.phone,
+            "phone_normalized": _normalize_phone(new_cust.phone),
+            "name": new_cust.name,
+            "address": new_cust.address or "",
+            "credit_balance": 0.0,
+            "created_at": new_cust.created_at.isoformat() if new_cust.created_at else "",
+            "updated_at": new_cust.updated_at.isoformat() if new_cust.updated_at else ""
+        }
+    }
+
+@app.post("/api/customers/pay-credit")
+async def pay_customer_credit(req: PayCreditRequest, db: Session = Depends(get_db)):
+    if req.amount_paid <= 0:
+        raise HTTPException(status_code=400, detail="Payment amount must be greater than Rs. 0.00.")
+
+    cust = db.query(CreditCustomer).filter(
+        CreditCustomer.id == req.customer_id,
+        CreditCustomer.business_code == req.business_code
+    ).first()
+    if not cust:
+        raise HTTPException(status_code=404, detail="Credit customer not found.")
+
+    staff_ident = (req.staff_user or "Admin").strip() or "Admin"
+    prev_balance = round(float(cust.credit_balance or 0.0), 2)
+    amt_paid = round(float(req.amount_paid), 2)
+    new_balance = round(max(0.0, prev_balance - amt_paid), 2)
+
+    cust.credit_balance = new_balance
+    cust.updated_at = datetime.now(timezone.utc)
+
+    today_str = datetime.now(timezone.utc).strftime("%Y%m%d")
+    receipt_no = f"CRPAY-{req.business_code}-{today_str}-{random.randint(1000, 9999)}"
+    ref_note = (req.note or "").strip() or f"Credit Settlement #{receipt_no}"
+
+    ledger_entry = CreditLedger(
+        business_code=req.business_code,
+        customer_id=cust.id,
+        customer_phone=cust.phone,
+        transaction_type="PAYMENT_RECEIVED",
+        amount=amt_paid,
+        balance_after=new_balance,
+        payment_method=req.payment_method or "Cash",
+        reference_note=ref_note,
+        staff_user=staff_ident,
+        created_at=datetime.now(timezone.utc)
+    )
+    db.add(ledger_entry)
+    db.commit()
+    db.refresh(cust)
+    db.refresh(ledger_entry)
+
+    log_activity(
+        db,
+        req.business_code,
+        staff_ident,
+        "CREDIT_PAYMENT",
+        f"Credit payment Rs. {amt_paid:.2f} ({req.payment_method}) received from '{cust.name}' ({cust.phone}). Balance: Rs. {prev_balance:.2f} -> Rs. {new_balance:.2f}"
+    )
+
+    await ws_manager.broadcast(req.business_code, {
+        "type": "CREDIT_UPDATED",
+        "action": "PAYMENT_RECEIVED",
+        "customer_id": cust.id,
+        "new_balance": new_balance
+    })
+
+    return {
+        "success": True,
+        "receipt_number": receipt_no,
+        "previous_balance": prev_balance,
+        "amount_paid": amt_paid,
+        "new_balance": new_balance,
+        "customer": {
+            "id": cust.id,
+            "business_code": cust.business_code,
+            "phone": cust.phone,
+            "phone_normalized": _normalize_phone(cust.phone),
+            "name": cust.name,
+            "address": cust.address or "",
+            "credit_balance": new_balance,
+            "updated_at": cust.updated_at.isoformat() if cust.updated_at else ""
+        },
+        "ledger_entry": {
+            "id": ledger_entry.id,
+            "customer_id": ledger_entry.customer_id,
+            "customer_phone": ledger_entry.customer_phone,
+            "transaction_type": ledger_entry.transaction_type,
+            "amount": amt_paid,
+            "balance_after": new_balance,
+            "payment_method": ledger_entry.payment_method,
+            "reference_note": ledger_entry.reference_note,
+            "staff_user": ledger_entry.staff_user,
+            "created_at": ledger_entry.created_at.isoformat() if ledger_entry.created_at else ""
+        }
+    }
+
+@app.get("/api/customers/{customer_id}/ledger")
+def get_customer_credit_ledger(customer_id: int, business_code: str, db: Session = Depends(get_db)):
+    cust = db.query(CreditCustomer).filter(
+        CreditCustomer.id == customer_id,
+        CreditCustomer.business_code == business_code
+    ).first()
+    if not cust:
+        raise HTTPException(status_code=404, detail="Credit customer not found.")
+
+    entries = db.query(CreditLedger).filter(
+        CreditLedger.business_code == business_code,
+        CreditLedger.customer_id == customer_id
+    ).order_by(desc(CreditLedger.created_at)).limit(300).all()
+
+    return {
+        "customer": {
+            "id": cust.id,
+            "business_code": cust.business_code,
+            "phone": cust.phone,
+            "name": cust.name,
+            "address": cust.address or "",
+            "credit_balance": round(float(cust.credit_balance or 0.0), 2),
+            "created_at": cust.created_at.isoformat() if cust.created_at else "",
+            "updated_at": cust.updated_at.isoformat() if cust.updated_at else ""
+        },
+        "ledger": [{
+            "id": l.id,
+            "customer_id": l.customer_id,
+            "customer_phone": l.customer_phone,
+            "transaction_type": l.transaction_type,
+            "amount": round(float(l.amount or 0.0), 2),
+            "balance_after": round(float(l.balance_after or 0.0), 2),
+            "payment_method": l.payment_method or "Cash",
+            "reference_note": l.reference_note or "",
+            "staff_user": l.staff_user or "Admin",
+            "created_at": l.created_at.isoformat() if l.created_at else ""
+        } for l in entries]
+    }
+
+# ---------------------------------------------------------------------------
+# Invoices & Billing (Real-Time Stock Deduction, Credit Ledger & Reprinting)
 # ---------------------------------------------------------------------------
 @app.post("/api/invoices")
 async def create_invoice(req: CreateInvoiceRequest, db: Session = Depends(get_db)):
     if not req.items:
         raise HTTPException(status_code=400, detail="Invoice must contain at least one item.")
+
+    staff_ident = (req.cashier_username or "Admin").strip() or "Admin"
+    is_credit_sale = str(req.payment_method or "").strip().upper() == "CREDIT"
+
+    # Validate Credit Customer if payment_method is Credit ("ණයට")
+    credit_customer = None
+    if is_credit_sale:
+        if req.customer_id:
+            credit_customer = db.query(CreditCustomer).filter(
+                CreditCustomer.id == req.customer_id,
+                CreditCustomer.business_code == req.business_code
+            ).first()
+        if not credit_customer and req.customer_phone:
+            norm_p = _normalize_phone(req.customer_phone)
+            all_custs = db.query(CreditCustomer).filter(
+                CreditCustomer.business_code == req.business_code
+            ).all()
+            for c in all_custs:
+                if c.phone.strip() == req.customer_phone.strip() or (norm_p and _normalize_phone(c.phone) == norm_p):
+                    credit_customer = c
+                    break
+        if not credit_customer:
+            raise HTTPException(
+                status_code=400,
+                detail="Please select or register a Credit Customer (ණය ගනුදෙනුකරු) before completing a Credit bill."
+            )
 
     # Generate sequential or timestamped invoice number
     today_str = datetime.now(timezone.utc).strftime("%Y%m%d")
@@ -1343,7 +1829,7 @@ async def create_invoice(req: CreateInvoiceRequest, db: Session = Depends(get_db
                 quantity_change=-cart_it.quantity,
                 previous_stock=prev,
                 new_stock=item.stock_quantity,
-                staff_username=req.cashier_username,
+                staff_username=staff_ident,
                 note=f"Sale Invoice #{inv_number}"
             )
             db.add(log)
@@ -1360,22 +1846,56 @@ async def create_invoice(req: CreateInvoiceRequest, db: Session = Depends(get_db
                 "total": cart_it.total
             })
 
-    staff_ident = (req.cashier_username or "Admin").strip() or "Admin"
+    net_payable = round(float(req.grand_total or 0.0), 2)
+    cash_received = round(float(req.cash_paid or 0.0), 2)
+    prev_credit_balance = 0.0
+    credit_added = 0.0
+    updated_credit_balance = 0.0
+    cust_name_final = (req.customer_name or "").strip()
+    cust_phone_final = (req.customer_phone or "").strip()
+    cust_addr_final = (req.customer_address or "").strip()
+
+    if is_credit_sale and credit_customer:
+        prev_credit_balance = round(float(credit_customer.credit_balance or 0.0), 2)
+        credit_added = round(max(0.0, net_payable - cash_received), 2)
+        updated_credit_balance = round(prev_credit_balance + credit_added, 2)
+
+        credit_customer.credit_balance = updated_credit_balance
+        credit_customer.updated_at = datetime.now(timezone.utc)
+        cust_name_final = credit_customer.name
+        cust_phone_final = credit_customer.phone
+        cust_addr_final = credit_customer.address or ""
+
+        # Record CREDIT_SALE entry in credit_ledger
+        ledger_rec = CreditLedger(
+            business_code=req.business_code,
+            customer_id=credit_customer.id,
+            customer_phone=credit_customer.phone,
+            transaction_type="CREDIT_SALE",
+            amount=credit_added,
+            balance_after=updated_credit_balance,
+            payment_method="Invoice",
+            reference_note=f"Invoice #{inv_number} (Bill: Rs. {net_payable:.2f}, Paid: Rs. {cash_received:.2f})",
+            staff_user=staff_ident,
+            created_at=datetime.now(timezone.utc)
+        )
+        db.add(ledger_rec)
+
     invoice = Invoice(
         business_code=req.business_code,
         invoice_number=inv_number,
         date_time=datetime.now(timezone.utc),
         cashier_username=staff_ident,
-        payment_method=req.payment_method or "Cash",
+        payment_method="Credit" if is_credit_sale else (req.payment_method or "Cash"),
         subtotal=float(req.subtotal or 0.0),
         discount_amount=float(req.discount_amount or 0.0),
         discount_percent=float(req.discount_percent or 0.0),
         tax_amount=float(req.tax_amount or 0.0),
-        grand_total=float(req.grand_total or 0.0),
-        cash_paid=float(req.cash_paid or 0.0),
+        grand_total=net_payable,
+        cash_paid=cash_received,
         balance_change=float(req.balance_change or 0.0),
-        customer_name=req.customer_name or "",
-        customer_phone=req.customer_phone or "",
+        customer_name=cust_name_final,
+        customer_phone=cust_phone_final,
         status="PAID",
         items_json=json.dumps(processed_items)
     )
@@ -1388,11 +1908,33 @@ async def create_invoice(req: CreateInvoiceRequest, db: Session = Depends(get_db
         "type": "INVOICE_CREATED",
         "invoice_id": invoice.id,
         "invoice_number": invoice.invoice_number,
-        "grand_total": invoice.grand_total
+        "grand_total": invoice.grand_total,
+        "is_credit": is_credit_sale
     })
+    if is_credit_sale and credit_customer:
+        await ws_manager.broadcast(req.business_code, {
+            "type": "CREDIT_UPDATED",
+            "action": "CREDIT_SALE",
+            "customer_id": credit_customer.id,
+            "new_balance": updated_credit_balance
+        })
 
-    log_activity(db, req.business_code, staff_ident, "BILL_CREATED",
-                 f"Created Invoice #{inv_number} ({req.payment_method}) - Total: Rs. {req.grand_total:.2f}")
+    if is_credit_sale and credit_customer:
+        log_activity(
+            db,
+            req.business_code,
+            staff_ident,
+            "BILL_CREATED",
+            f"Created Credit Invoice #{inv_number} for {cust_name_final} ({cust_phone_final}) - Credit Added: Rs. {credit_added:.2f} | New Credit Balance: Rs. {updated_credit_balance:.2f}"
+        )
+    else:
+        log_activity(
+            db,
+            req.business_code,
+            staff_ident,
+            "BILL_CREATED",
+            f"Created Invoice #{inv_number} ({req.payment_method}) - Total: Rs. {req.grand_total:.2f}"
+        )
 
     return {
         "success": True,
@@ -1411,6 +1953,13 @@ async def create_invoice(req: CreateInvoiceRequest, db: Session = Depends(get_db
         "grand_total": float(invoice.grand_total or 0.0),
         "cash_paid": float(invoice.cash_paid or 0.0),
         "balance_change": float(invoice.balance_change or 0.0),
+        "customer_id": credit_customer.id if credit_customer else None,
+        "customer_name": cust_name_final or "Walk-in Customer",
+        "customer_phone": cust_phone_final,
+        "customer_address": cust_addr_final,
+        "previous_credit_balance": prev_credit_balance,
+        "credit_added": credit_added,
+        "customer_credit_balance": updated_credit_balance,
         "status": invoice.status,
         "items": processed_items
     }
@@ -1456,6 +2005,13 @@ def get_invoices(
         if u.username:
             user_display_map[u.username.lower()] = u.full_name or u.username
 
+    # Map customer phones to credit customer records
+    credit_customers = db.query(CreditCustomer).filter(CreditCustomer.business_code == business_code).all()
+    cust_phone_map = {}
+    for cc in credit_customers:
+        if cc.phone:
+            cust_phone_map[_normalize_phone(cc.phone)] = cc
+
     result = []
     for inv in invoices:
         items = []
@@ -1480,7 +2036,12 @@ def get_invoices(
         sub_tot = float(inv.subtotal or grand_tot)
         disc_amt = float(inv.discount_amount or 0.0)
         tax_amt = float(inv.tax_amount or 0.0)
+        cash_p = float(inv.cash_paid if inv.cash_paid is not None else grand_tot)
         est_profit = max(0.0, grand_tot - est_cost) if inv.status == "PAID" else 0.0
+
+        is_cr = str(inv.payment_method or "").upper() == "CREDIT"
+        cr_added = round(max(0.0, grand_tot - cash_p), 2) if is_cr else 0.0
+        matched_cc = cust_phone_map.get(_normalize_phone(inv.customer_phone or "")) if inv.customer_phone else None
 
         result.append({
             "id": inv.id,
@@ -1493,14 +2054,18 @@ def get_invoices(
             "user_name": raw_staff,
             "cashier": display_staff,
             "created_by": raw_staff,
-            "customer_name": inv.customer_name or "Walk-in Customer",
+            "customer_id": matched_cc.id if matched_cc else None,
+            "customer_name": inv.customer_name or (matched_cc.name if matched_cc else "Walk-in Customer"),
             "customer_phone": inv.customer_phone or "",
+            "customer_address": matched_cc.address if matched_cc else "",
+            "credit_added": cr_added,
+            "customer_credit_balance": round(float(matched_cc.credit_balance or 0.0), 2) if matched_cc else 0.0,
             "payment_method": inv.payment_method or "Cash",
             "subtotal": round(sub_tot, 2),
             "discount_amount": round(disc_amt, 2),
             "tax_amount": round(tax_amt, 2),
             "grand_total": round(grand_tot, 2),
-            "cash_paid": round(float(inv.cash_paid or grand_tot), 2),
+            "cash_paid": round(cash_p, 2),
             "balance_change": round(float(inv.balance_change or 0.0), 2),
             "estimated_cost": round(est_cost, 2),
             "estimated_profit": round(est_profit, 2),
@@ -1512,8 +2077,8 @@ def get_invoices(
     return result
 
 @app.post("/api/invoices/{invoice_id}/void")
-async def void_invoice(invoice_id: int, business_code: str, db: Session = Depends(get_db)):
-    """Void invoice and restore item stock automatically"""
+async def void_invoice(invoice_id: int, business_code: str, staff_username: Optional[str] = "Admin", db: Session = Depends(get_db)):
+    """Void invoice, restore item stock, and reverse credit balance if Credit sale"""
     inv = db.query(Invoice).filter(Invoice.id == invoice_id, Invoice.business_code == business_code).first()
     if not inv:
         raise HTTPException(status_code=404, detail="Invoice not found.")
@@ -1522,6 +2087,7 @@ async def void_invoice(invoice_id: int, business_code: str, db: Session = Depend
         raise HTTPException(status_code=400, detail="This invoice is already voided.")
 
     inv.status = "VOIDED"
+    staff_ident = (staff_username or "Admin").strip() or "Admin"
 
     # Restore stocks
     try:
@@ -1543,12 +2109,36 @@ async def void_invoice(invoice_id: int, business_code: str, db: Session = Depend
                     quantity_change=it["quantity"],
                     previous_stock=prev,
                     new_stock=item_db.stock_quantity,
-                    staff_username="Admin",
+                    staff_username=staff_ident,
                     note=f"Stock Restored from Voided Invoice #{inv.invoice_number}"
                 )
                 db.add(log)
     except Exception as e:
         logger.error(f"[VOID ERROR] {e}")
+
+    # Reverse customer credit if this was a Credit invoice
+    if str(inv.payment_method or "").upper() == "CREDIT" and inv.customer_phone:
+        norm_p = _normalize_phone(inv.customer_phone)
+        all_custs = db.query(CreditCustomer).filter(CreditCustomer.business_code == business_code).all()
+        for cc in all_custs:
+            if cc.phone.strip() == inv.customer_phone.strip() or (norm_p and _normalize_phone(cc.phone) == norm_p):
+                cr_to_reverse = max(0.0, float(inv.grand_total or 0.0) - float(inv.cash_paid or 0.0))
+                if cr_to_reverse > 0:
+                    cc.credit_balance = round(max(0.0, float(cc.credit_balance or 0.0) - cr_to_reverse), 2)
+                    cc.updated_at = datetime.now(timezone.utc)
+                    db.add(CreditLedger(
+                        business_code=business_code,
+                        customer_id=cc.id,
+                        customer_phone=cc.phone,
+                        transaction_type="PAYMENT_RECEIVED",
+                        amount=round(cr_to_reverse, 2),
+                        balance_after=cc.credit_balance,
+                        payment_method="Void Reversal",
+                        reference_note=f"Voided Credit Bill #{inv.invoice_number}",
+                        staff_user=staff_ident,
+                        created_at=datetime.now(timezone.utc)
+                    ))
+                break
 
     db.commit()
 
@@ -1557,8 +2147,12 @@ async def void_invoice(invoice_id: int, business_code: str, db: Session = Depend
         "invoice_id": inv.id,
         "invoice_number": inv.invoice_number
     })
+    await ws_manager.broadcast(business_code, {
+        "type": "CREDIT_UPDATED",
+        "action": "INVOICE_VOIDED"
+    })
 
-    log_activity(db, business_code, "Staff", "BILL_VOIDED",
+    log_activity(db, business_code, staff_ident, "BILL_VOIDED",
                  f"Voided Invoice #{inv.invoice_number} (Rs. {inv.grand_total:.2f}). Stock restored.")
 
     return {"success": True, "message": f"Invoice {inv.invoice_number} voided and stock restored."}
@@ -2053,11 +2647,28 @@ if not os.path.exists(assets_dir):
     os.makedirs(assets_dir, exist_ok=True)
 app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
+@app.middleware("http")
+async def disable_static_cache(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.endswith(".html") or path.endswith(".js") or path.endswith(".css"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
 @app.get("/")
 def serve_index():
     index_file = os.path.join(os.path.dirname(__file__), "index.html")
     if os.path.exists(index_file):
-        return FileResponse(index_file)
+        return FileResponse(
+            index_file,
+            headers={
+                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+        )
     return JSONResponse({"status": "SupiriPOS PRO Backend is running. Please add index.html."})
 
 # Fallback for any client side routing

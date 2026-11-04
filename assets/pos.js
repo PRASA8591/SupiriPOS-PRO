@@ -8,7 +8,7 @@
 const AppState = {
   currentView: 'landing', // 'landing', 'pos-login', 'workspace'
   currentTab: 'dashboard',// 'dashboard', 'billing', 'items', 'stock', 'users', 'reports'
-  currentReportsSubTab: 'sales', // 'sales', 'bincard', 'activity'
+  currentReportsSubTab: 'sales', // 'sales', 'credit', 'bincard', 'activity'
   business: null,         // { business_code, name, address, phone, receipt_footer, logo_base64 }
   user: null,             // { username, full_name, role_title, permissions }
   pendingAdminUser: null, // Temporary storage during mandatory first-login password change
@@ -30,6 +30,21 @@ const AppState = {
   lowStockCountSummary: 0,
   users: [],                   // Cached staff accounts for staff name resolution
   lowStockItems: [],           // Cache of items below alert threshold for interactive review
+  creditCustomers: [],         // In-memory cached credit customers for 0ms phone lookup
+  creditLedger: [],            // Recent credit ledger entries
+  creditSummary: {
+    total_outstanding_credit: 0,
+    active_credit_customers: 0,
+    total_customers: 0,
+    credit_collected_today: 0
+  },
+  selectedCreditCustomer: null,// Currently selected customer on Billing when paymentMode === 'Credit'
+  creditCustomerFilter: 'all', // 'all', 'active', 'settled'
+  activePayCreditCustomerId: null,
+  activeHistoryCustomerId: null,
+  activeHistoryCustomer: null,
+  activeHistoryLedger: [],
+  addCustomerFromBilling: false,
   socket: null,
   wsReconnectTimer: null,
   syncInterval: null,
@@ -308,15 +323,22 @@ function handleRealtimeEvent(event) {
     }
   } else if (event.type === 'INVOICE_CREATED') {
     loadItemsCatalog(AppState.currentTab === 'billing');
+    loadCreditCustomersData();
     if (AppState.currentTab === 'dashboard') loadDashboardStats();
     if (AppState.currentTab === 'reports') loadReportsData();
     if (AppState.currentTab === 'stock') loadStockLogs();
   } else if (event.type === 'INVOICE_VOIDED') {
     loadItemsCatalog(AppState.currentTab === 'billing');
+    loadCreditCustomersData();
     if (AppState.currentTab === 'dashboard') loadDashboardStats();
     if (AppState.currentTab === 'reports') loadReportsData();
     if (AppState.currentTab === 'stock') loadStockLogs();
     showToast(`Invoice #${event.invoice_number} voided. Stock restored.`, "warning", 3000);
+  } else if (event.type === 'CREDIT_UPDATED') {
+    loadCreditCustomersData();
+    if (AppState.currentTab === 'reports' && AppState.currentReportsSubTab === 'activity') {
+      loadActivityLogsData();
+    }
   } else if (event.type === 'USERS_UPDATED') {
     if (AppState.currentTab === 'users') loadUsersTable();
     if (AppState.currentTab === 'dashboard') loadDashboardStats();
@@ -339,10 +361,19 @@ function startPollingFallback() {
         updateSyncStatusUI(true);
       }
       const data = await res.json();
+      if (Array.isArray(data.credit_customers)) {
+        AppState.creditCustomers = data.credit_customers;
+      }
+      if (Array.isArray(data.credit_ledger)) {
+        AppState.creditLedger = data.credit_ledger;
+      }
       if (AppState.stateVersion !== null && data.state_version !== AppState.stateVersion) {
         AppState.stateVersion = data.state_version;
         await loadItemsCatalog(AppState.currentTab === 'billing');
         if (AppState.currentTab === 'dashboard') loadDashboardStats();
+        if (AppState.currentTab === 'reports' && AppState.currentReportsSubTab === 'credit') {
+          loadCreditCustomersData();
+        }
       } else if (AppState.stateVersion === null) {
         AppState.stateVersion = data.state_version;
       }
@@ -940,6 +971,9 @@ function enterWorkspace() {
   // Load Held Bills from localStorage
   loadHeldBills();
 
+  // Pre-load credit customers in memory for 0ms phone lookup on Billing
+  loadCreditCustomersData();
+
   // Pre-load items catalog in memory for 0ms instant search & tab switching
   loadItemsCatalog(true).then(() => {
     switchPOSTab(initialTab);
@@ -1349,6 +1383,10 @@ function clearCurrentCart() {
   AppState.cart = [];
   document.getElementById('bill-discount-input').value = '0';
   document.getElementById('bill-cash-received').value = '';
+  const creditPhoneEl = document.getElementById('billing-credit-phone-input');
+  if (creditPhoneEl) creditPhoneEl.value = '';
+  AppState.selectedCreditCustomer = null;
+  handleBillingCreditPhoneInput('');
   renderCartUI();
   showToast("Bill cleared.", "info", 1500);
 }
@@ -1412,15 +1450,39 @@ function calculateBillTotals() {
   document.getElementById('bill-grand-total').textContent = `Rs. ${grandTotal.toFixed(2)}`;
 
   const cashInput = parseFloat(document.getElementById('bill-cash-received').value) || 0;
-  const changeDue = Math.max(0, cashInput - grandTotal);
-
   const changeEl = document.getElementById('bill-change-due');
-  changeEl.textContent = `Rs. ${changeDue.toFixed(2)}`;
+  const changeLabelEl = document.getElementById('bill-change-due-label');
 
-  if (cashInput >= grandTotal && grandTotal > 0) {
-    changeEl.style.color = "var(--emerald)";
+  if (AppState.paymentMode === 'Credit') {
+    const creditAdded = Math.max(0, grandTotal - cashInput);
+    if (changeLabelEl) {
+      changeLabelEl.textContent = "Credit Added (ණයට එකතුව)";
+      changeLabelEl.style.color = "var(--warning)";
+    }
+    changeEl.textContent = `Rs. ${creditAdded.toFixed(2)}`;
+    changeEl.style.color = "var(--warning)";
+
+    if (AppState.selectedCreditCustomer) {
+      const prevBal = safeNum(AppState.selectedCreditCustomer.credit_balance);
+      const newBal = prevBal + creditAdded;
+      const prevEl = document.getElementById('billing-credit-prev-balance');
+      const newEl = document.getElementById('billing-credit-new-balance');
+      if (prevEl) prevEl.textContent = `Rs. ${prevBal.toFixed(2)}`;
+      if (newEl) newEl.textContent = `Rs. ${newBal.toFixed(2)}`;
+    }
   } else {
-    changeEl.style.color = "var(--text-dim)";
+    const changeDue = Math.max(0, cashInput - grandTotal);
+    if (changeLabelEl) {
+      changeLabelEl.textContent = "Balance / Change (ඉතුරු)";
+      changeLabelEl.style.color = "var(--emerald)";
+    }
+    changeEl.textContent = `Rs. ${changeDue.toFixed(2)}`;
+
+    if (cashInput >= grandTotal && grandTotal > 0) {
+      changeEl.style.color = "var(--emerald)";
+    } else {
+      changeEl.style.color = "var(--text-dim)";
+    }
   }
 }
 
@@ -1433,11 +1495,228 @@ function selectPaymentMode(mode) {
   });
 
   const tenderShortcuts = document.getElementById('cash-tender-shortcuts');
-  if (mode === 'Cash') {
-    tenderShortcuts.style.display = 'flex';
+  const creditPanel = document.getElementById('billing-credit-customer-panel');
+  const cashLabel = document.getElementById('bill-cash-received-label');
+
+  if (mode === 'Credit') {
+    if (tenderShortcuts) tenderShortcuts.style.display = 'none';
+    if (creditPanel) creditPanel.style.display = 'flex';
+    if (cashLabel) cashLabel.textContent = 'Down Payment / Cash Now (අත්තිකාරම්)';
+    document.getElementById('bill-cash-received').value = '0';
+    calculateBillTotals();
+    const phoneInput = document.getElementById('billing-credit-phone-input');
+    if (phoneInput) {
+      handleBillingCreditPhoneInput(phoneInput.value || '');
+      phoneInput.focus();
+    }
+  } else if (mode === 'Cash') {
+    if (tenderShortcuts) tenderShortcuts.style.display = 'flex';
+    if (creditPanel) creditPanel.style.display = 'none';
+    if (cashLabel) cashLabel.textContent = 'Cash Received (රු.)';
+    calculateBillTotals();
   } else {
-    tenderShortcuts.style.display = 'none';
+    if (tenderShortcuts) tenderShortcuts.style.display = 'none';
+    if (creditPanel) creditPanel.style.display = 'none';
+    if (cashLabel) cashLabel.textContent = 'Cash Received (රු.)';
     setExactTender();
+  }
+}
+
+function normalizeClientPhone(phoneStr) {
+  return String(phoneStr || '').replace(/[^\d+]/g, '').trim();
+}
+
+let _creditLookupTimer = null;
+function handleBillingCreditPhoneInput(rawPhone) {
+  const cleanPhone = normalizeClientPhone(rawPhone);
+  const foundCard = document.getElementById('billing-credit-found-card');
+  const notFoundCard = document.getElementById('billing-credit-notfound-card');
+  const statusBadge = document.getElementById('billing-credit-status-badge');
+
+  if (!cleanPhone) {
+    AppState.selectedCreditCustomer = null;
+    if (foundCard) foundCard.style.display = 'none';
+    if (notFoundCard) notFoundCard.style.display = 'none';
+    if (statusBadge) {
+      statusBadge.className = 'badge badge-warning';
+      statusBadge.textContent = 'Required';
+    }
+    return;
+  }
+
+  // 1. Instant 0ms lookup against in-memory cached creditCustomers
+  const localMatch = (AppState.creditCustomers || []).find(
+    c => normalizeClientPhone(c.phone) === cleanPhone
+  );
+
+  if (localMatch) {
+    selectBillingCreditCustomer(localMatch);
+    return;
+  }
+
+  // Partial match if user typed at least 9 digits
+  if (cleanPhone.length >= 9) {
+    const suffixMatch = (AppState.creditCustomers || []).find(
+      c => normalizeClientPhone(c.phone).endsWith(cleanPhone.slice(-9))
+    );
+    if (suffixMatch) {
+      selectBillingCreditCustomer(suffixMatch);
+      return;
+    }
+  }
+
+  // Not found locally yet
+  AppState.selectedCreditCustomer = null;
+  if (foundCard) foundCard.style.display = 'none';
+  if (notFoundCard) {
+    notFoundCard.style.display = cleanPhone.length >= 1 ? 'flex' : 'none';
+  }
+  if (statusBadge) {
+    statusBadge.className = 'badge badge-danger';
+    statusBadge.textContent = 'Not Found';
+  }
+
+  // Also check server via debounced lookup if 9+ digits entered
+  clearTimeout(_creditLookupTimer);
+  if (cleanPhone.length >= 9 && AppState.business) {
+    _creditLookupTimer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/customers/lookup?business_code=${encodeURIComponent(AppState.business.business_code)}&phone=${encodeURIComponent(cleanPhone)}`
+        );
+        const data = await res.json();
+        if (res.ok && data.found && data.customer) {
+          // Upsert into AppState.creditCustomers
+          const idx = AppState.creditCustomers.findIndex(c => c.id === data.customer.id);
+          if (idx >= 0) AppState.creditCustomers[idx] = data.customer;
+          else AppState.creditCustomers.unshift(data.customer);
+          selectBillingCreditCustomer(data.customer);
+        }
+      } catch (e) { }
+    }, 180);
+  }
+}
+
+function selectBillingCreditCustomer(customer) {
+  AppState.selectedCreditCustomer = customer;
+  const foundCard = document.getElementById('billing-credit-found-card');
+  const notFoundCard = document.getElementById('billing-credit-notfound-card');
+  const statusBadge = document.getElementById('billing-credit-status-badge');
+
+  if (notFoundCard) notFoundCard.style.display = 'none';
+  if (statusBadge) {
+    statusBadge.className = 'badge badge-emerald';
+    statusBadge.textContent = '✓ Selected';
+  }
+  if (foundCard) {
+    foundCard.style.display = 'block';
+    const nameEl = document.getElementById('billing-credit-cust-name');
+    const addrEl = document.getElementById('billing-credit-cust-address');
+    const prevEl = document.getElementById('billing-credit-prev-balance');
+    const newEl = document.getElementById('billing-credit-new-balance');
+
+    const subtotal = AppState.cart.reduce((sum, item) => sum + item.total, 0);
+    const discountInput = parseFloat(document.getElementById('bill-discount-input')?.value) || 0;
+    const grandTotal = Math.max(0, subtotal - discountInput);
+    const cashInput = parseFloat(document.getElementById('bill-cash-received')?.value) || 0;
+    const creditAdded = Math.max(0, grandTotal - cashInput);
+    const prevBal = safeNum(customer.credit_balance);
+    const newBal = prevBal + creditAdded;
+
+    if (nameEl) nameEl.textContent = `${customer.name} (${customer.phone})`;
+    if (addrEl) addrEl.textContent = customer.address || 'No address provided';
+    if (prevEl) prevEl.textContent = `Rs. ${prevBal.toFixed(2)}`;
+    if (newEl) newEl.textContent = `Rs. ${newBal.toFixed(2)}`;
+  }
+}
+
+function openAddCreditCustomerModal(fromBilling = true) {
+  AppState.addCustomerFromBilling = Boolean(fromBilling);
+  const phoneInputEl = document.getElementById('credit-cust-form-phone');
+  const nameInputEl = document.getElementById('credit-cust-form-name');
+  const addrInputEl = document.getElementById('credit-cust-form-address');
+
+  const billingPhone = document.getElementById('billing-credit-phone-input')?.value || '';
+  const searchPhone = document.getElementById('credit-customers-search-input')?.value || '';
+  const prefillPhone = fromBilling ? normalizeClientPhone(billingPhone) : normalizeClientPhone(searchPhone);
+
+  if (phoneInputEl) phoneInputEl.value = prefillPhone || '';
+  if (nameInputEl) nameInputEl.value = '';
+  if (addrInputEl) addrInputEl.value = '';
+
+  const modal = document.getElementById('modal-add-credit-customer');
+  if (modal) modal.classList.add('active');
+
+  setTimeout(() => {
+    if (prefillPhone && nameInputEl) {
+      nameInputEl.focus();
+    } else if (phoneInputEl) {
+      phoneInputEl.focus();
+    }
+  }, 60);
+}
+
+function closeAddCreditCustomerModal() {
+  const modal = document.getElementById('modal-add-credit-customer');
+  if (modal) modal.classList.remove('active');
+}
+
+async function handleSaveCreditCustomer(e) {
+  e.preventDefault();
+  if (!AppState.business) return;
+
+  const phone = normalizeClientPhone(document.getElementById('credit-cust-form-phone')?.value || '');
+  const name = (document.getElementById('credit-cust-form-name')?.value || '').trim();
+  const address = (document.getElementById('credit-cust-form-address')?.value || '').trim();
+
+  if (!phone) {
+    showToast("Please enter customer mobile number.", "warning");
+    return;
+  }
+  if (!name) {
+    showToast("Please enter customer full name.", "warning");
+    return;
+  }
+
+  const staffUser = AppState.user?.username || AppState.user?.full_name || 'Admin';
+
+  try {
+    const res = await fetch('/api/customers/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        business_code: AppState.business.business_code,
+        phone,
+        name,
+        address,
+        staff_user: staffUser
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Failed to save customer');
+
+    const savedCust = data.customer;
+    if (savedCust) {
+      const existingIdx = AppState.creditCustomers.findIndex(c => c.id === savedCust.id);
+      if (existingIdx >= 0) {
+        AppState.creditCustomers[existingIdx] = savedCust;
+      } else {
+        AppState.creditCustomers.unshift(savedCust);
+      }
+    }
+
+    closeAddCreditCustomerModal();
+    showToast(`Customer "${name}" (${phone}) registered!`, "success");
+
+    if (AppState.addCustomerFromBilling && savedCust) {
+      const billingPhoneEl = document.getElementById('billing-credit-phone-input');
+      if (billingPhoneEl) billingPhoneEl.value = savedCust.phone;
+      selectBillingCreditCustomer(savedCust);
+    }
+
+    loadCreditCustomersData();
+  } catch (err) {
+    showToast(err.message, "error");
   }
 }
 
@@ -1567,6 +1846,16 @@ async function completeSaleAndPrint() {
     return;
   }
 
+  // Validate Credit Customer selection when payment mode is Credit ("ණයට")
+  if (AppState.paymentMode === 'Credit') {
+    if (!AppState.selectedCreditCustomer) {
+      showToast("⚠️ Please enter a Customer Mobile Number and select or register a Credit Customer for ණයට (Credit) sales!", "warning", 4500);
+      const phoneInput = document.getElementById('billing-credit-phone-input');
+      if (phoneInput) phoneInput.focus();
+      return;
+    }
+  }
+
   const changeDue = Math.max(0, cashPaid - grandTotal);
   const activeStaffUsername = (
     AppState.user?.username ||
@@ -1574,6 +1863,9 @@ async function completeSaleAndPrint() {
     AppState.user?.staff_name ||
     'Admin'
   );
+
+  const isCreditSale = AppState.paymentMode === 'Credit';
+  const selectedCust = isCreditSale ? AppState.selectedCreditCustomer : null;
 
   const payload = {
     business_code: AppState.business.business_code,
@@ -1584,8 +1876,12 @@ async function completeSaleAndPrint() {
     discount_percent: 0.0,
     tax_amount: 0.0,
     grand_total: grandTotal,
-    cash_paid: (AppState.paymentMode === 'Cash') ? cashPaid : grandTotal,
+    cash_paid: isCreditSale ? Math.max(0, cashPaid) : ((AppState.paymentMode === 'Cash') ? cashPaid : grandTotal),
     balance_change: (AppState.paymentMode === 'Cash') ? changeDue : 0.0,
+    customer_id: selectedCust ? selectedCust.id : null,
+    customer_name: selectedCust ? selectedCust.name : 'Walk-in Customer',
+    customer_phone: selectedCust ? selectedCust.phone : '',
+    customer_address: selectedCust ? (selectedCust.address || '') : '',
     items: AppState.cart
   };
 
@@ -1601,11 +1897,24 @@ async function completeSaleAndPrint() {
 
     AppState.lastInvoice = data;
 
-    // Reset Cart
+    // Refresh Credit Customers cache so updated balance is immediately reflected
+    if (isCreditSale) {
+      loadCreditCustomersData();
+    }
+
+    // Reset Cart & Credit Customer input
     AppState.cart = [];
     document.getElementById('bill-discount-input').value = '0';
     document.getElementById('bill-cash-received').value = '';
-    renderCartUI();
+    const creditPhoneEl = document.getElementById('billing-credit-phone-input');
+    if (creditPhoneEl) creditPhoneEl.value = '';
+    AppState.selectedCreditCustomer = null;
+    handleBillingCreditPhoneInput('');
+    if (isCreditSale) {
+      selectPaymentMode('Cash');
+    } else {
+      renderCartUI();
+    }
 
     // Open Thermal Receipt Modal
     openReceiptModal(data);
@@ -1637,7 +1946,11 @@ function switchReceiptFormat(format) {
   });
 
   if (AppState.lastInvoice) {
-    renderThermalReceipt(AppState.lastInvoice, format);
+    if (AppState.lastInvoice._isCreditPaymentReceipt) {
+      renderCreditPaymentReceipt(AppState.lastInvoice, format);
+    } else {
+      renderThermalReceipt(AppState.lastInvoice, format);
+    }
   }
 }
 
@@ -1670,6 +1983,30 @@ function renderThermalReceipt(inv, format = '80mm') {
   const grandTotal = safeNum(inv.grand_total);
   const cashPaid = safeNum(inv.cash_paid, grandTotal);
   const balanceChange = safeNum(inv.balance_change);
+  const isCredit = String(inv.payment_method || '').toUpperCase() === 'CREDIT' || safeNum(inv.credit_added) > 0;
+  const creditAdded = isCredit ? safeNum(inv.credit_added, Math.max(0, grandTotal - cashPaid)) : 0;
+  const prevCreditBal = safeNum(inv.previous_credit_balance);
+  const totalOutBal = safeNum(inv.new_credit_balance ?? inv.customer_credit_balance, prevCreditBal + creditAdded);
+
+  const creditCustomerBlock = isCredit ? `
+    <div style="border-top: 1px dashed #000; margin-top: 6px; padding-top: 6px; font-size: ${is58mm ? '10px' : '11px'};">
+      <div style="font-weight: bold; text-align: center; margin-bottom: 3px;">--- CREDIT SALE (ණය බිල්පත) ---</div>
+      <div>Customer : <strong>${inv.customer_name || 'Credit Customer'}</strong></div>
+      ${inv.customer_phone ? `<div>Mobile   : ${inv.customer_phone}</div>` : ''}
+      <div style="display: flex; justify-content: space-between; margin-top: 3px;">
+        <span>Previous Credit Bal:</span>
+        <span>Rs. ${prevCreditBal.toFixed(2)}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-weight: bold;">
+        <span>This Bill Credit:</span>
+        <span>+ Rs. ${creditAdded.toFixed(2)}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-weight: bold; border-top: 1px solid #000; margin-top: 3px; padding-top: 3px;">
+        <span>TOTAL OUTSTANDING:</span>
+        <span>Rs. ${totalOutBal.toFixed(2)}</span>
+      </div>
+    </div>
+  ` : '';
 
   const html = `
     <div style="${widthStyle} margin: 0 auto; line-height: 1.35; color: #000000; font-family: 'Courier New', Courier, monospace;">
@@ -1718,17 +2055,94 @@ function renderThermalReceipt(inv, format = '80mm') {
           <span>Rs. ${grandTotal.toFixed(2)}</span>
         </div>
         <div style="display: flex; justify-content: space-between;">
-          <span>Cash Paid:</span>
+          <span>${isCredit ? 'Cash Paid Now:' : 'Cash Paid:'}</span>
           <span>Rs. ${cashPaid.toFixed(2)}</span>
         </div>
-        <div style="display: flex; justify-content: space-between; font-weight: bold;">
-          <span>Balance:</span>
-          <span>Rs. ${balanceChange.toFixed(2)}</span>
-        </div>
+        ${!isCredit ? `
+          <div style="display: flex; justify-content: space-between; font-weight: bold;">
+            <span>Balance:</span>
+            <span>Rs. ${balanceChange.toFixed(2)}</span>
+          </div>
+        ` : ''}
       </div>
+
+      ${creditCustomerBlock}
 
       <div style="text-align: center; margin-top: 14px; font-size: 10px; border-top: 1px dashed #000; padding-top: 8px;">
         <div>${biz.receipt_footer || 'Thank You! Come Again!'}</div>
+        <div style="font-size: 8px; margin-top: 4px; opacity: 0.7;">Powered by PrasaTek System Solutions • pos.prasatek.lk</div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('thermal-receipt-preview').innerHTML = html;
+  document.getElementById('printable-receipt-container').innerHTML = html;
+}
+
+function renderCreditPaymentReceipt(paymentData, format = '80mm') {
+  const biz = AppState.business || {};
+  const is58mm = format === '58mm';
+  const widthStyle = is58mm ? 'max-width: 240px; font-size: 10px;' : 'max-width: 320px; font-size: 12px;';
+
+  const logoHtml = biz.logo_base64 ? `
+    <div style="text-align: center; margin-bottom: 8px;">
+      <img src="${biz.logo_base64}" alt="Logo" style="max-height: 48px; max-width: 140px; object-fit: contain;">
+    </div>
+  ` : '';
+
+  const cust = paymentData.customer || {};
+  const prevBal = safeNum(paymentData.previous_balance);
+  const paidAmt = safeNum(paymentData.amount_paid);
+  const newBal = safeNum(paymentData.new_balance);
+  const staffDisplay = paymentData.staff_user || resolveStaffName(AppState.user, 'Admin');
+  const dtStr = paymentData.ledger_entry?.created_at
+    ? new Date(paymentData.ledger_entry.created_at).toLocaleString()
+    : new Date().toLocaleString();
+
+  const html = `
+    <div style="${widthStyle} margin: 0 auto; line-height: 1.4; color: #000000; font-family: 'Courier New', Courier, monospace;">
+      ${logoHtml}
+      <div style="text-align: center; font-weight: bold; font-size: ${is58mm ? '13px' : '16px'}; margin-bottom: 2px;">
+        ${biz.name || 'SupiriPOS PRO'}
+      </div>
+      <div style="text-align: center; font-size: 10px; margin-bottom: 4px;">
+        ${biz.address || ''}
+      </div>
+      <div style="text-align: center; font-size: 10px; margin-bottom: 8px;">
+        Tel: ${biz.phone || ''}
+      </div>
+
+      <div style="border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 5px 0; margin-bottom: 8px; text-align: center; font-weight: bold; font-size: ${is58mm ? '11px' : '13px'};">
+        CREDIT PAYMENT RECEIPT<br>
+        <span style="font-size: 10px; font-weight: normal;">(ණය ගෙවීම් ලදුපත)</span>
+      </div>
+
+      <div style="font-size: 10px; margin-bottom: 8px;">
+        <div>Date     : ${dtStr}</div>
+        <div>Customer : <strong>${cust.name || '-'}</strong></div>
+        <div>Mobile   : ${cust.phone || '-'}</div>
+        <div>Method   : ${paymentData.payment_method || 'Cash'}</div>
+        <div>Staff    : ${staffDisplay}</div>
+        ${paymentData.reference_note ? `<div>Note     : ${paymentData.reference_note}</div>` : ''}
+      </div>
+
+      <div style="border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 6px 0; font-size: ${is58mm ? '10px' : '11px'};">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+          <span>Previous Credit Balance:</span>
+          <span>Rs. ${prevBal.toFixed(2)}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: ${is58mm ? '12px' : '13px'}; margin: 4px 0;">
+          <span>AMOUNT PAID (ගෙවූ මුදල):</span>
+          <span>- Rs. ${paidAmt.toFixed(2)}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-weight: bold; border-top: 1px solid #000; padding-top: 4px; margin-top: 4px;">
+          <span>REMAINING BALANCE (ඉතිරි ණය):</span>
+          <span>Rs. ${newBal.toFixed(2)}</span>
+        </div>
+      </div>
+
+      <div style="text-align: center; margin-top: 14px; font-size: 10px; padding-top: 4px;">
+        <div>Thank You For Your Payment!</div>
         <div style="font-size: 8px; margin-top: 4px; opacity: 0.7;">Powered by PrasaTek System Solutions • pos.prasatek.lk</div>
       </div>
     </div>
@@ -2160,18 +2574,18 @@ async function deleteUser(userId) {
 }
 
 // ---------------------------------------------------------------------------
-// PAGE 5: 📈 REPORTS, ITEM BIN CARD & USER ACTIVITY AUDIT LOG
+// PAGE 5: 📈 REPORTS, ITEM BIN CARD, CREDIT CUSTOMERS & USER ACTIVITY AUDIT LOG
 // ---------------------------------------------------------------------------
 function switchReportsSubTab(subTab) {
   AppState.currentReportsSubTab = subTab;
 
-  const subTabs = ['sales', 'bincard', 'activity'];
+  const subTabs = ['sales', 'credit', 'bincard', 'activity'];
   subTabs.forEach(st => {
     const btn = document.getElementById(`subnav-btn-${st}`);
     const sec = document.getElementById(`subtab-reports-${st}`);
     const isActive = (st === subTab);
     if (btn) {
-      btn.className = isActive ? 'btn btn-sm btn-cyan' : 'btn btn-sm btn-glass';
+      btn.className = isActive ? 'btn btn-sm btn-cyan whitespace-nowrap' : 'btn btn-sm btn-glass whitespace-nowrap';
     }
     if (sec) {
       sec.classList.toggle('active-subtab', isActive);
@@ -2186,6 +2600,8 @@ function switchReportsSubTab(subTab) {
 
   if (subTab === 'sales') {
     loadReportsData();
+  } else if (subTab === 'credit') {
+    loadCreditCustomersData();
   } else if (subTab === 'bincard') {
     initBinCardProductDropdown();
     loadBinCardData();
@@ -2760,9 +3176,9 @@ function renderFilteredReportsUI() {
   const elSales = document.getElementById('kpi-total-sales');
   const elSalesSub = document.getElementById('kpi-total-sales-sub');
   const elProfit = document.getElementById('kpi-net-profit');
-  const elProfitSub = document.getElementById('kpi-profit-margin-sub');
+  const elProfitSub = document.getElementById('kpi-profit-margin-sub') || document.getElementById('kpi-net-profit-sub');
   const elInvoices = document.getElementById('kpi-total-invoices');
-  const elItemsSub = document.getElementById('kpi-total-items-sub');
+  const elItemsSub = document.getElementById('kpi-total-items-sub') || document.getElementById('kpi-total-items-sold');
   const elAvgBill = document.getElementById('kpi-avg-bill-value');
   const elDiscounts = document.getElementById('kpi-total-discounts');
   const elDiscountSub = document.getElementById('kpi-discount-bills-sub');
@@ -3062,12 +3478,12 @@ function openInvoiceDetailsModal(invId) {
   const staffDisplay = resolveStaffName(inv, 'Admin');
   const dtStr = inv.date_time ? new Date(inv.date_time).toLocaleString() : '-';
 
-  const invNoEl = document.getElementById('detail-modal-inv-no');
-  const statusEl = document.getElementById('detail-modal-status-badge');
-  const dtEl = document.getElementById('detail-modal-datetime');
-  const staffEl = document.getElementById('detail-modal-staff');
-  const payEl = document.getElementById('detail-modal-payment');
-  const itemsCountEl = document.getElementById('detail-modal-items-count');
+  const invNoEl = document.getElementById('inv-detail-number') || document.getElementById('detail-modal-inv-no');
+  const statusEl = document.getElementById('inv-detail-status') || document.getElementById('detail-modal-status-badge');
+  const dtEl = document.getElementById('inv-detail-datetime') || document.getElementById('detail-modal-datetime');
+  const staffEl = document.getElementById('inv-detail-staff') || document.getElementById('detail-modal-staff');
+  const payEl = document.getElementById('inv-detail-payment') || document.getElementById('detail-modal-payment');
+  const itemsCountEl = document.getElementById('inv-detail-items-count') || document.getElementById('detail-modal-items-count');
 
   if (invNoEl) invNoEl.textContent = inv.invoice_number;
   if (statusEl) {
@@ -3076,26 +3492,34 @@ function openInvoiceDetailsModal(invId) {
   }
   if (dtEl) dtEl.textContent = `📅 ${dtStr}`;
   if (staffEl) staffEl.textContent = `👤 ${staffDisplay}`;
-  if (payEl) payEl.textContent = `💳 ${inv.payment_method || 'Cash'}`;
+  if (payEl) {
+    const custSuffix = (inv.customer_name && inv.customer_name !== 'Walk-in Customer')
+      ? ` • ${inv.customer_name}`
+      : '';
+    payEl.textContent = `💳 ${inv.payment_method || 'Cash'}${custSuffix}`;
+  }
   if (itemsCountEl) {
     itemsCountEl.textContent = `${safeNum(inv.item_count, (inv.items || []).length)} Line Items (${safeNum(inv.total_quantity)} Units)`;
   }
 
-  const tbody = document.getElementById('detail-modal-items-tbody');
+  const tbody = document.getElementById('inv-detail-items-body') || document.getElementById('detail-modal-items-tbody');
   if (tbody) {
     const items = Array.isArray(inv.items) ? inv.items : [];
     if (items.length === 0) {
       tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 18px; color: var(--text-dim);">No line items recorded on this bill.</td></tr>`;
     } else {
-      tbody.innerHTML = items.map(it => {
+      tbody.innerHTML = items.map((it, idx) => {
         const qty = safeNum(it.quantity, 1);
         const unitPrice = safeNum(it.selling_price ?? it.unit_price, 0);
         const disc = safeNum(it.discount, 0);
         const lineTotal = safeNum(it.total, Math.max(0, (qty * unitPrice) - disc));
         return `
           <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-            <td style="padding: 9px 12px; font-family: var(--font-mono); font-size: 12px; color: var(--cyan); white-space: nowrap;">${it.code || '-'}</td>
-            <td style="padding: 9px 12px; font-weight: 600; color: #ffffff;">${it.name || 'Item'}</td>
+            <td style="padding: 9px 12px; font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); white-space: nowrap;">${idx + 1}</td>
+            <td style="padding: 9px 12px; font-weight: 600; color: #ffffff;">
+              ${it.name || 'Item'}
+              <div style="font-family: var(--font-mono); font-size: 11px; color: var(--cyan);">${it.code || '-'}</div>
+            </td>
             <td style="padding: 9px 12px; text-align: center; font-family: var(--font-mono); color: #ffffff; white-space: nowrap;">${qty} ${it.unit || 'Pcs'}</td>
             <td style="padding: 9px 12px; text-align: right; font-family: var(--font-mono); color: var(--text-muted); white-space: nowrap;">Rs. ${unitPrice.toFixed(2)}</td>
             <td style="padding: 9px 12px; text-align: right; font-family: var(--font-mono); color: ${disc > 0 ? '#f59e0b' : 'var(--text-dim)'}; white-space: nowrap;">
@@ -3108,16 +3532,18 @@ function openInvoiceDetailsModal(invId) {
     }
   }
 
-  const subEl = document.getElementById('detail-modal-subtotal');
-  const discEl = document.getElementById('detail-modal-discount');
+  const subEl = document.getElementById('inv-detail-subtotal') || document.getElementById('detail-modal-subtotal');
+  const discEl = document.getElementById('inv-detail-discount') || document.getElementById('detail-modal-discount');
+  const profitEl = document.getElementById('inv-detail-profit');
   const taxEl = document.getElementById('detail-modal-tax');
-  const grandEl = document.getElementById('detail-modal-grand-total');
-  const cashEl = document.getElementById('detail-modal-cash-paid');
-  const changeEl = document.getElementById('detail-modal-change');
-  const voidBtn = document.getElementById('detail-modal-void-btn');
+  const grandEl = document.getElementById('inv-detail-grand-total') || document.getElementById('detail-modal-grand-total');
+  const cashEl = document.getElementById('inv-detail-cash-paid') || document.getElementById('detail-modal-cash-paid');
+  const changeEl = document.getElementById('inv-detail-balance') || document.getElementById('detail-modal-change');
+  const voidBtn = document.getElementById('inv-detail-void-btn') || document.getElementById('detail-modal-void-btn');
 
   if (subEl) subEl.textContent = `Rs. ${safeNum(inv.subtotal).toFixed(2)}`;
   if (discEl) discEl.textContent = `- Rs. ${safeNum(inv.discount_amount).toFixed(2)}`;
+  if (profitEl) profitEl.textContent = `Rs. ${safeNum(inv.estimated_profit).toFixed(2)}`;
   if (taxEl) taxEl.textContent = `Rs. ${safeNum(inv.tax_amount).toFixed(2)}`;
   if (grandEl) grandEl.textContent = `Rs. ${safeNum(inv.grand_total).toFixed(2)}`;
   if (cashEl) cashEl.textContent = `Rs. ${safeNum(inv.cash_paid).toFixed(2)}`;
@@ -3407,6 +3833,477 @@ function printSalesReportPDF() {
         <div class="footer">
           Powered by PrasaTek System Solutions • SupiriPOS PRO Cloud Enterprise POS
         </div>
+        <script>window.onload = () => { window.print(); };<\/script>
+      </body>
+    </html>
+  `);
+  printWin.document.close();
+}
+
+// ---------------------------------------------------------------------------
+// SUB-TAB 4: 💳 CREDIT CUSTOMERS & REPAYMENT / SETTLEMENT SYSTEM ("ණයට")
+// ---------------------------------------------------------------------------
+async function loadCreditCustomersData() {
+  if (!AppState.business) return;
+
+  try {
+    const res = await fetch(`/api/customers?business_code=${encodeURIComponent(AppState.business.business_code)}`);
+    if (!res.ok) return;
+    const data = await res.json();
+
+    AppState.creditCustomers = Array.isArray(data.customers) ? data.customers : [];
+    AppState.creditLedger = Array.isArray(data.recent_ledger) ? data.recent_ledger : [];
+    AppState.creditSummary = data.summary || {
+      total_outstanding_credit: 0,
+      active_credit_customers: 0,
+      total_customers: AppState.creditCustomers.length,
+      credit_collected_today: 0
+    };
+
+    // Update selectedCreditCustomer in Billing if currently selected
+    if (AppState.selectedCreditCustomer) {
+      const updatedCust = AppState.creditCustomers.find(c => c.id === AppState.selectedCreditCustomer.id);
+      if (updatedCust) {
+        AppState.selectedCreditCustomer = updatedCust;
+        if (AppState.paymentMode === 'Credit') {
+          selectBillingCreditCustomer(updatedCust);
+        }
+      }
+    }
+
+    renderCreditSummaryKPIs();
+    renderCreditCustomersTable();
+  } catch (err) {
+    console.error("[CREDIT CUSTOMERS LOAD ERROR]", err);
+  }
+}
+
+function renderCreditSummaryKPIs() {
+  const sum = AppState.creditSummary || {};
+  const customers = Array.isArray(AppState.creditCustomers) ? AppState.creditCustomers : [];
+
+  const totalOut = safeNum(
+    sum.total_outstanding_credit,
+    customers.reduce((acc, c) => acc + Math.max(0, safeNum(c.credit_balance)), 0)
+  );
+  const activeCount = safeNum(
+    sum.active_credit_customers,
+    customers.filter(c => safeNum(c.credit_balance) > 0.009).length
+  );
+  const totalCount = safeNum(sum.total_customers, customers.length);
+  const collectedToday = safeNum(sum.credit_collected_today, 0);
+
+  const elOut = document.getElementById('credit-kpi-total-outstanding');
+  const elActive = document.getElementById('credit-kpi-active-customers');
+  const elTotalSub = document.getElementById('credit-kpi-total-customers-sub');
+  const elCollected = document.getElementById('credit-kpi-collected-today');
+
+  if (elOut) elOut.textContent = `Rs. ${totalOut.toFixed(2)}`;
+  if (elActive) elActive.textContent = String(activeCount);
+  if (elTotalSub) elTotalSub.textContent = `Out of ${totalCount} registered credit customer${totalCount === 1 ? '' : 's'}`;
+  if (elCollected) elCollected.textContent = `Rs. ${collectedToday.toFixed(2)}`;
+}
+
+function selectCreditCustomerFilter(filterType) {
+  AppState.creditCustomerFilter = filterType || 'all';
+  const btns = document.querySelectorAll('.credit-filter-btn');
+  btns.forEach(btn => {
+    const f = btn.getAttribute('data-filter');
+    btn.className = (f === AppState.creditCustomerFilter)
+      ? 'btn btn-sm btn-cyan credit-filter-btn'
+      : 'btn btn-sm btn-glass credit-filter-btn';
+  });
+  renderCreditCustomersTable();
+}
+
+function renderCreditCustomersTable() {
+  const tbody = document.getElementById('credit-customers-table-body');
+  if (!tbody) return;
+
+  const query = (document.getElementById('credit-customers-search-input')?.value || '').trim().toLowerCase();
+  const filterMode = AppState.creditCustomerFilter || 'all';
+  const allCustomers = Array.isArray(AppState.creditCustomers) ? AppState.creditCustomers : [];
+
+  const filtered = allCustomers.filter(c => {
+    const bal = safeNum(c.credit_balance);
+    if (filterMode === 'active' && bal <= 0.009) return false;
+    if (filterMode === 'settled' && bal > 0.009) return false;
+
+    if (query) {
+      const nameMatch = String(c.name || '').toLowerCase().includes(query);
+      const phoneMatch = String(c.phone || '').toLowerCase().includes(query);
+      const addrMatch = String(c.address || '').toLowerCase().includes(query);
+      if (!nameMatch && !phoneMatch && !addrMatch) return false;
+    }
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" style="text-align: center; padding: 28px; color: var(--text-dim);">
+          No credit customers match the current search or filter.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(c => {
+    const bal = safeNum(c.credit_balance);
+    const hasDebt = bal > 0.009;
+    const balColor = hasDebt ? '#ef4444' : 'var(--emerald)';
+    const balBadge = hasDebt
+      ? `<span class="badge badge-danger" style="margin-left: 6px; font-size: 10px;">DUE</span>`
+      : `<span class="badge badge-emerald" style="margin-left: 6px; font-size: 10px;">SETTLED</span>`;
+
+    const lastDt = (c.last_transaction_at || c.updated_at || c.created_at)
+      ? new Date(c.last_transaction_at || c.updated_at || c.created_at).toLocaleString()
+      : '-';
+
+    let lastTypeBadge = '';
+    if (c.last_transaction_type === 'CREDIT_SALE') {
+      lastTypeBadge = `<div style="font-size: 11px; color: var(--warning);">🧾 Credit Bill (+Rs. ${safeNum(c.last_transaction_amount).toFixed(2)})</div>`;
+    } else if (c.last_transaction_type === 'PAYMENT_RECEIVED') {
+      lastTypeBadge = `<div style="font-size: 11px; color: var(--emerald);">💵 Payment (-Rs. ${safeNum(c.last_transaction_amount).toFixed(2)})</div>`;
+    } else if (c.last_transaction_type === 'VOID_REVERSAL') {
+      lastTypeBadge = `<div style="font-size: 11px; color: var(--cyan);">🔄 Void Reversal (-Rs. ${safeNum(c.last_transaction_amount).toFixed(2)})</div>`;
+    }
+
+    return `
+      <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+        <td style="padding: 12px; font-weight: 800; color: #ffffff; white-space: nowrap;">
+          👤 ${c.name || '-'}
+        </td>
+        <td style="padding: 12px; font-family: var(--font-mono); font-weight: 700; color: var(--cyan); white-space: nowrap;">
+          📱 ${c.phone || '-'}
+        </td>
+        <td style="padding: 12px; color: var(--text-muted); font-size: 13px;">
+          ${c.address || '-'}
+        </td>
+        <td style="padding: 12px; text-align: right; font-family: var(--font-mono); font-size: 15px; font-weight: 800; color: ${balColor}; white-space: nowrap;">
+          Rs. ${bal.toFixed(2)} ${balBadge}
+        </td>
+        <td style="padding: 12px; font-size: 12px; color: var(--text-muted); white-space: nowrap;">
+          <div>${lastDt}</div>
+          ${lastTypeBadge}
+        </td>
+        <td style="padding: 12px; text-align: right; white-space: nowrap;">
+          <button class="btn btn-sm btn-emerald" style="margin-right: 6px;"
+            onclick="openPayCreditModal(${c.id})"
+            ${!hasDebt ? 'disabled style="opacity: 0.45; cursor: not-allowed; margin-right: 6px;"' : ''}>
+            💵 Update / Pay Credit
+          </button>
+          <button class="btn btn-sm btn-cyan" onclick="openCreditHistoryModal(${c.id})">
+            📜 Credit History
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function openPayCreditModal(customerId) {
+  const cust = (AppState.creditCustomers || []).find(c => Number(c.id) === Number(customerId));
+  if (!cust) {
+    showToast("Customer record not found.", "warning");
+    return;
+  }
+
+  AppState.activePayCreditCustomerId = cust.id;
+  const currentBal = safeNum(cust.credit_balance);
+
+  const nameEl = document.getElementById('pay-credit-cust-name');
+  const phoneEl = document.getElementById('pay-credit-cust-phone');
+  const balEl = document.getElementById('pay-credit-current-balance');
+  const amtInput = document.getElementById('pay-credit-amount-input');
+  const methodSel = document.getElementById('pay-credit-method-select');
+  const noteInput = document.getElementById('pay-credit-note-input');
+
+  if (nameEl) nameEl.textContent = cust.name || 'Customer';
+  if (phoneEl) phoneEl.textContent = `📱 ${cust.phone || ''} ${cust.address ? '• ' + cust.address : ''}`;
+  if (balEl) balEl.textContent = `Rs. ${currentBal.toFixed(2)}`;
+  if (amtInput) {
+    amtInput.value = currentBal > 0 ? currentBal.toFixed(2) : '';
+    amtInput.max = String(currentBal);
+  }
+  if (methodSel) methodSel.value = 'Cash';
+  if (noteInput) noteInput.value = '';
+
+  updateCreditPaymentPreview();
+
+  const modal = document.getElementById('modal-pay-credit');
+  if (modal) modal.classList.add('active');
+  setTimeout(() => {
+    if (amtInput) {
+      amtInput.focus();
+      amtInput.select();
+    }
+  }, 60);
+}
+
+function closePayCreditModal() {
+  const modal = document.getElementById('modal-pay-credit');
+  if (modal) modal.classList.remove('active');
+}
+
+function fillFullCreditPayment() {
+  const cust = (AppState.creditCustomers || []).find(c => Number(c.id) === Number(AppState.activePayCreditCustomerId));
+  if (!cust) return;
+  const amtInput = document.getElementById('pay-credit-amount-input');
+  if (amtInput) {
+    amtInput.value = safeNum(cust.credit_balance).toFixed(2);
+    updateCreditPaymentPreview();
+  }
+}
+
+function updateCreditPaymentPreview() {
+  const cust = (AppState.creditCustomers || []).find(c => Number(c.id) === Number(AppState.activePayCreditCustomerId));
+  const currentBal = cust ? safeNum(cust.credit_balance) : 0;
+  const payAmt = safeNum(document.getElementById('pay-credit-amount-input')?.value, 0);
+  const remaining = Math.max(0, currentBal - payAmt);
+
+  const previewEl = document.getElementById('pay-credit-remaining-preview');
+  if (previewEl) {
+    previewEl.textContent = `Rs. ${remaining.toFixed(2)}`;
+    previewEl.style.color = remaining <= 0.009 ? 'var(--emerald)' : 'var(--warning)';
+  }
+}
+
+async function submitCreditPayment(andPrintReceipt = false) {
+  if (!AppState.business) return;
+  const cust = (AppState.creditCustomers || []).find(c => Number(c.id) === Number(AppState.activePayCreditCustomerId));
+  if (!cust) {
+    showToast("No credit customer selected.", "warning");
+    return;
+  }
+
+  const amountPaid = safeNum(document.getElementById('pay-credit-amount-input')?.value, 0);
+  const currentBal = safeNum(cust.credit_balance);
+  if (amountPaid <= 0) {
+    showToast("Please enter a valid payment amount greater than Rs. 0.", "warning");
+    return;
+  }
+  if (amountPaid > currentBal + 0.05) {
+    showToast(`Payment amount (Rs. ${amountPaid.toFixed(2)}) exceeds current credit balance (Rs. ${currentBal.toFixed(2)}).`, "warning");
+    return;
+  }
+
+  const paymentMethod = document.getElementById('pay-credit-method-select')?.value || 'Cash';
+  const referenceNote = (document.getElementById('pay-credit-note-input')?.value || '').trim();
+  const staffUser = AppState.user?.username || AppState.user?.full_name || 'Admin';
+
+  try {
+    const res = await fetch('/api/customers/pay-credit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        business_code: AppState.business.business_code,
+        customer_id: cust.id,
+        customer_phone: cust.phone,
+        amount_paid: amountPaid,
+        payment_method: paymentMethod,
+        reference_note: referenceNote || `Credit Payment (${paymentMethod})`,
+        staff_user: staffUser
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Failed to record credit payment');
+
+    closePayCreditModal();
+    showToast(
+      `✅ Credit payment of Rs. ${safeNum(data.amount_paid).toFixed(2)} recorded for ${cust.name}! New Balance: Rs. ${safeNum(data.new_balance).toFixed(2)}`,
+      "success",
+      4500
+    );
+
+    await loadCreditCustomersData();
+
+    // If Credit History Modal is currently open for this customer, refresh it too
+    const historyModal = document.getElementById('modal-credit-history');
+    if (historyModal && historyModal.classList.contains('active') && Number(AppState.activeHistoryCustomerId) === Number(cust.id)) {
+      openCreditHistoryModal(cust.id);
+    }
+
+    if (andPrintReceipt) {
+      const receiptData = {
+        ...data,
+        _isCreditPaymentReceipt: true,
+        payment_method: paymentMethod,
+        reference_note: referenceNote,
+        staff_user: staffUser
+      };
+      AppState.lastInvoice = receiptData;
+      renderCreditPaymentReceipt(receiptData, AppState.currentReceiptFormat);
+      document.getElementById('modal-receipt').classList.add('active');
+    }
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+async function openCreditHistoryModal(customerId) {
+  if (!AppState.business) return;
+  AppState.activeHistoryCustomerId = customerId;
+
+  try {
+    const res = await fetch(
+      `/api/customers/${encodeURIComponent(customerId)}/ledger?business_code=${encodeURIComponent(AppState.business.business_code)}`
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Failed to load customer credit history');
+
+    const cust = data.customer || {};
+    const ledger = Array.isArray(data.ledger) ? data.ledger : [];
+    AppState.activeHistoryCustomer = cust;
+    AppState.activeHistoryLedger = ledger;
+
+    const nameEl = document.getElementById('credit-history-cust-name');
+    const metaEl = document.getElementById('credit-history-cust-meta');
+    const balEl = document.getElementById('credit-history-cust-balance');
+    const tbody = document.getElementById('credit-history-table-body');
+
+    const bal = safeNum(cust.credit_balance);
+    if (nameEl) nameEl.textContent = `👤 ${cust.name || 'Customer'}`;
+    if (metaEl) metaEl.textContent = `📱 ${cust.phone || '-'} • 📍 ${cust.address || 'No address specified'}`;
+    if (balEl) {
+      balEl.textContent = `Rs. ${bal.toFixed(2)}`;
+      balEl.style.color = bal > 0.009 ? 'var(--warning)' : 'var(--emerald)';
+    }
+
+    if (tbody) {
+      if (ledger.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--text-dim);">No credit transactions recorded for this customer yet.</td></tr>`;
+      } else {
+        tbody.innerHTML = ledger.map(entry => {
+          const dtStr = entry.created_at ? new Date(entry.created_at).toLocaleString() : '-';
+          const isSale = entry.transaction_type === 'CREDIT_SALE';
+          const isPay = entry.transaction_type === 'PAYMENT_RECEIVED';
+
+          let typeBadge = `<span class="badge badge-cyan">${entry.transaction_type}</span>`;
+          let amtStr = `Rs. ${safeNum(entry.amount).toFixed(2)}`;
+          let amtColor = '#ffffff';
+
+          if (isSale) {
+            typeBadge = `<span class="badge badge-warning">🧾 CREDIT BILL (ණයට ගැනීම)</span>`;
+            amtStr = `+ Rs. ${safeNum(entry.amount).toFixed(2)}`;
+            amtColor = '#f59e0b';
+          } else if (isPay) {
+            typeBadge = `<span class="badge badge-emerald">💵 PAYMENT RECEIVED (ණය ගෙවීම)</span>`;
+            amtStr = `- Rs. ${safeNum(entry.amount).toFixed(2)}`;
+            amtColor = '#10b981';
+          } else if (entry.transaction_type === 'VOID_REVERSAL') {
+            typeBadge = `<span class="badge badge-cyan">🔄 VOID REVERSAL</span>`;
+            amtStr = `- Rs. ${safeNum(entry.amount).toFixed(2)}`;
+            amtColor = '#06b6d4';
+          }
+
+          return `
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+              <td style="padding: 10px 12px; font-size: 12px; color: var(--text-muted); white-space: nowrap;">${dtStr}</td>
+              <td style="padding: 10px 12px; white-space: nowrap;">${typeBadge}</td>
+              <td style="padding: 10px 12px; color: #ffffff; font-size: 12.5px;">${entry.reference_note || '-'}</td>
+              <td style="padding: 10px 12px; font-size: 12px; color: var(--text-muted); white-space: nowrap;">${entry.payment_method || '-'}</td>
+              <td style="padding: 10px 12px; font-size: 12px; color: var(--text-main); white-space: nowrap;">👤 ${entry.staff_user || 'Admin'}</td>
+              <td style="padding: 10px 12px; text-align: right; font-family: var(--font-mono); font-weight: 800; color: ${amtColor}; white-space: nowrap;">${amtStr}</td>
+              <td style="padding: 10px 12px; text-align: right; font-family: var(--font-mono); font-weight: 800; color: var(--cyan); white-space: nowrap;">Rs. ${safeNum(entry.balance_after).toFixed(2)}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+    }
+
+    const modal = document.getElementById('modal-credit-history');
+    if (modal) modal.classList.add('active');
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+function closeCreditHistoryModal() {
+  const modal = document.getElementById('modal-credit-history');
+  if (modal) modal.classList.remove('active');
+}
+
+function openPayCreditFromHistoryModal() {
+  const custId = AppState.activeHistoryCustomerId;
+  if (!custId) return;
+  openPayCreditModal(custId);
+}
+
+function printCustomerCreditStatement() {
+  const cust = AppState.activeHistoryCustomer;
+  const ledger = Array.isArray(AppState.activeHistoryLedger) ? AppState.activeHistoryLedger : [];
+  const biz = AppState.business || {};
+  if (!cust) return;
+
+  const rowsHtml = ledger.map(entry => {
+    const dtStr = entry.created_at ? new Date(entry.created_at).toLocaleString() : '-';
+    const isSale = entry.transaction_type === 'CREDIT_SALE';
+    const typeLabel = isSale
+      ? 'CREDIT BILL (ණයට ගැනීම)'
+      : (entry.transaction_type === 'PAYMENT_RECEIVED' ? 'PAYMENT RECEIVED (ණය ගෙවීම)' : entry.transaction_type);
+    const sign = isSale ? '+' : '-';
+    return `
+      <tr>
+        <td>${dtStr}</td>
+        <td><strong>${typeLabel}</strong></td>
+        <td>${entry.reference_note || '-'}</td>
+        <td>${entry.payment_method || '-'}</td>
+        <td>${entry.staff_user || 'Admin'}</td>
+        <td style="text-align: right;">${sign} Rs. ${safeNum(entry.amount).toFixed(2)}</td>
+        <td style="text-align: right;"><strong>Rs. ${safeNum(entry.balance_after).toFixed(2)}</strong></td>
+      </tr>
+    `;
+  }).join('');
+
+  const printWin = window.open('', '_blank', 'width=960,height=720');
+  if (!printWin) {
+    showToast("Pop-up blocked! Please allow pop-ups to print statement.", "warning");
+    return;
+  }
+
+  printWin.document.write(`
+    <html>
+      <head>
+        <title>Credit Statement — ${cust.name} (${cust.phone})</title>
+        <style>
+          body { font-family: 'Segoe UI', Arial, sans-serif; padding: 28px; color: #0f172a; }
+          .header { display: flex; justify-content: space-between; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 18px; }
+          h2 { margin: 0 0 4px 0; }
+          p { margin: 2px 0; font-size: 12.5px; color: #475569; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
+          th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; }
+          th { background: #e2e8f0; text-transform: uppercase; font-size: 11px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <h2>${biz.name || 'SupiriPOS PRO'} — Customer Credit Ledger Statement</h2>
+            <p><strong>Customer:</strong> ${cust.name} &nbsp;|&nbsp; <strong>Mobile:</strong> ${cust.phone} &nbsp;|&nbsp; <strong>Address:</strong> ${cust.address || '-'}</p>
+          </div>
+          <div style="text-align: right;">
+            <p><strong>Current Credit Balance:</strong> Rs. ${safeNum(cust.credit_balance).toFixed(2)}</p>
+            <p><strong>Printed:</strong> ${new Date().toLocaleString()}</p>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Date & Time</th>
+              <th>Transaction Type</th>
+              <th>Reference / Note</th>
+              <th>Method</th>
+              <th>Staff</th>
+              <th style="text-align: right;">Amount (Rs.)</th>
+              <th style="text-align: right;">Balance After (Rs.)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml || '<tr><td colspan="7" style="text-align:center;">No transactions found</td></tr>'}
+          </tbody>
+        </table>
         <script>window.onload = () => { window.print(); };<\/script>
       </body>
     </html>
