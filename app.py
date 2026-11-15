@@ -13,6 +13,7 @@ import smtplib
 import hashlib
 import ssl
 import urllib.parse
+import threading
 from datetime import datetime, timedelta, timezone
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -1006,19 +1007,22 @@ def send_otp(req: SendOTPRequest, db: Session = Depends(get_db)):
         f"Smart POS & Enterprise Software Solutions — Sri Lanka\n"
     )
 
-    email_sent, error_reason = send_smtp_email_detailed(
-        to_email=email_clean,
-        subject=f"Your SupiriPOS PRO Verification Code: {otp}",
-        html_content=html_content,
-        plain_text=plain_text
-    )
+    # Fire-and-forget: send the email in a background thread so the API
+    # responds instantly (<50ms) and never times out on Render / cloud hosting.
+    def _bg_send():
+        try:
+            ok, err = send_smtp_email_detailed(
+                to_email=email_clean,
+                subject=f"Your SupiriPOS PRO Verification Code: {otp}",
+                html_content=html_content,
+                plain_text=plain_text
+            )
+            if not ok:
+                logger.error(f"[OTP BG-SMTP ERROR] Failed sending OTP to {email_clean}: {err}")
+        except Exception as bg_err:
+            logger.error(f"[OTP BG-SMTP EXCEPTION] {bg_err}")
 
-    if not email_sent:
-        logger.error(f"[OTP SMTP ERROR] Failed sending OTP to {email_clean}: {error_reason}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to send verification email to {email_clean}. Technical reason: {error_reason}"
-        )
+    threading.Thread(target=_bg_send, daemon=True).start()
 
     return {
         "success": True,

@@ -183,6 +183,7 @@ def init_database_engine():
     fast_engine = create_engine(
         sqlite_url,
         connect_args={"check_same_thread": False},
+        poolclass=QueuePool,
         pool_size=20,
         max_overflow=10,
         pool_recycle=1800

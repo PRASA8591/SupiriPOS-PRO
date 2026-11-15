@@ -507,13 +507,15 @@ function goToRegStep(step) {
 }
 
 async function sendRegistrationOTP() {
+  const btn = document.getElementById('btn-send-otp');
   const email = document.getElementById('reg-email').value.trim();
   if (!email || !email.includes('@')) {
     showToast("Please enter a valid email address.", "warning");
     return;
   }
 
-  showToast(`Sending 6-digit verification email to ${email}...`, "info", 2000);
+  // Instant visual feedback
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-dot"></span> Sending…'; }
 
   try {
     const res = await fetch('/api/auth/send-otp', {
@@ -538,12 +540,17 @@ async function sendRegistrationOTP() {
       "success",
       6000
     );
+    // Keep button disabled briefly to prevent spam clicks
+    if (btn) { btn.innerHTML = '✓ Sent'; }
+    setTimeout(() => { if (btn) { btn.disabled = false; btn.innerHTML = 'Send OTP'; } }, 30000);
   } catch (err) {
     showToast(err.message, "error");
+    if (btn) { btn.disabled = false; btn.innerHTML = 'Send OTP'; }
   }
 }
 
 async function verifyOTPAndGoStep2() {
+  const btn = document.getElementById('btn-verify-otp');
   const email = document.getElementById('reg-email').value.trim();
   const password = document.getElementById('reg-master-password').value.trim();
   const otp = document.getElementById('reg-otp-code').value.trim();
@@ -557,6 +564,9 @@ async function verifyOTPAndGoStep2() {
     return;
   }
 
+  // Instant visual feedback
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-dot"></span> Verifying…'; }
+
   try {
     const res = await fetch('/api/auth/verify-otp', {
       method: 'POST',
@@ -566,9 +576,11 @@ async function verifyOTPAndGoStep2() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || 'OTP verification failed');
     showToast("Email verified successfully!", "success");
+    if (btn) { btn.disabled = false; btn.innerHTML = 'Verify & Continue ➔'; }
     goToRegStep(2);
   } catch (err) {
     showToast(err.message, "error");
+    if (btn) { btn.disabled = false; btn.innerHTML = 'Verify & Continue ➔'; }
   }
 }
 
@@ -601,6 +613,7 @@ function handleLogoUpload(e) {
 }
 
 async function completeBusinessRegistration() {
+  const btn = document.getElementById('btn-complete-reg');
   const email = document.getElementById('reg-email').value.trim();
   const masterPassword = document.getElementById('reg-master-password').value.trim();
   const ownerName = document.getElementById('reg-owner-name').value.trim();
@@ -615,7 +628,8 @@ async function completeBusinessRegistration() {
     return;
   }
 
-  showToast("Registering business & provisioning database...", "info", 2000);
+  // Instant visual feedback
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-dot"></span> Registering…'; }
 
   try {
     const res = await fetch('/api/auth/register-business', {
@@ -643,9 +657,11 @@ async function completeBusinessRegistration() {
     document.getElementById('card-business-code').textContent = data.business_code;
     document.getElementById('card-master-password').textContent = data.master_password;
     showToast(`🎉 Registration Complete! Your Code: ${data.business_code}`, "success", 4000);
+    if (btn) { btn.disabled = false; btn.innerHTML = '🚀 Complete Registration'; }
     goToRegStep(4);
   } catch (err) {
     showToast(err.message, "error");
+    if (btn) { btn.disabled = false; btn.innerHTML = '🚀 Complete Registration'; }
   }
 }
 

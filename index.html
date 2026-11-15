@@ -268,6 +268,24 @@
       }
     }
 
+    .spinner-dot {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.35);
+      border-radius: 50%;
+      border-top-color: #ffffff;
+      animation: spin-dot 0.75s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+
+    @keyframes spin-dot {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
     /* Forms & Inputs */
     .form-group {
       display: flex;
@@ -685,7 +703,6 @@
       <div style="display: flex; align-items: center; gap: 14px;">
         <div id="db-connection-pill" class="badge badge-emerald">
           <span class="pulse-dot"></span>
-          <span id="db-status-text">Cloud Engine Active</span>
           <span id="db-status-text">SUPABASE CLOUD ONLINE</span>
         </div>
         <button class="btn btn-glass btn-sm" onclick="openUserGuideModal()">
@@ -942,10 +959,7 @@
               <span id="ws-sync-status" style="color: var(--emerald);">Online • Synced</span>
             </div>
             <span id="ws-db-badge"
-              style="font-size: 10.5px; color: #06b6d4; font-weight: 700; white-space: nowrap;">Supabase Cloud</span>
-            <span id="ws-db-badge"
-              style="font-size: 10.5px; color: #10b981; font-weight: 700; white-space: nowrap;">SUPABASE CLOUD
-              ONLINE</span>
+              style="font-size: 10.5px; color: #10b981; font-weight: 700; white-space: nowrap;">SUPABASE CLOUD ONLINE</span>
           </div>
         </div>
       </div>
@@ -2286,7 +2300,7 @@
           <div style="display: flex; gap: 8px;">
             <input type="email" id="reg-email" class="form-control" style="flex: 1;" placeholder="owner@myshop.lk"
               required>
-            <button type="button" class="btn btn-cyan btn-sm" onclick="sendRegistrationOTP()">
+            <button type="button" id="btn-send-otp" class="btn btn-cyan btn-sm" onclick="sendRegistrationOTP()">
               Send OTP
             </button>
           </div>
@@ -2308,7 +2322,7 @@
             maxlength="6" placeholder="123456">
         </div>
 
-        <button type="button" class="btn btn-emerald btn-lg" style="width: 100%; margin-top: 14px;"
+        <button type="button" id="btn-verify-otp" class="btn btn-emerald btn-lg" style="width: 100%; margin-top: 14px;"
           onclick="verifyOTPAndGoStep2()">
           Verify & Continue ➔
         </button>
@@ -2370,7 +2384,7 @@
 
         <div style="display: flex; gap: 10px; margin-top: 14px;">
           <button type="button" class="btn btn-glass" onclick="goToRegStep(2)">Back</button>
-          <button type="button" class="btn btn-emerald btn-lg" style="flex: 1;"
+          <button type="button" id="btn-complete-reg" class="btn btn-emerald btn-lg" style="flex: 1;"
             onclick="completeBusinessRegistration()">🚀 Complete Registration</button>
         </div>
       </div>
@@ -3031,8 +3045,7 @@
   <div id="printable-receipt-container"></div>
 
   <!-- Main POS Client-Side Controller -->
-  <script src="/assets/pos.js?v=20261106_smtp"></script>
-  <script src="/assets/pos.js?v=20261115_supabase_online"></script>
+  <script src="/assets/pos.js?v=20261115_instant_btn"></script>
 </body>
 
 </html>
