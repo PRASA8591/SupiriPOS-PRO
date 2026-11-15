@@ -389,18 +389,26 @@ function startPollingFallback() {
 // View & Screen Transitions
 // ---------------------------------------------------------------------------
 function showView(viewId) {
-  document.getElementById('view-landing').style.display = 'none';
-  document.getElementById('view-pos-login').style.display = 'none';
-  document.getElementById('view-workspace').style.display = 'none';
+  const landing = document.getElementById('view-landing');
+  const posLogin = document.getElementById('view-pos-login');
+  const workspace = document.getElementById('view-workspace');
+  const masterAdmin = document.getElementById('view-master-admin');
+
+  if (landing) landing.style.display = 'none';
+  if (posLogin) posLogin.style.display = 'none';
+  if (workspace) workspace.style.display = 'none';
+  if (masterAdmin) masterAdmin.style.display = 'none';
 
   AppState.currentView = viewId;
 
   if (viewId === 'landing') {
-    document.getElementById('view-landing').style.display = 'flex';
+    if (landing) landing.style.display = 'flex';
   } else if (viewId === 'pos-login') {
-    document.getElementById('view-pos-login').style.display = 'flex';
+    if (posLogin) posLogin.style.display = 'flex';
   } else if (viewId === 'workspace') {
-    document.getElementById('view-workspace').style.display = 'flex';
+    if (workspace) workspace.style.display = 'flex';
+  } else if (viewId === 'master-admin') {
+    if (masterAdmin) masterAdmin.style.display = 'block';
   }
 }
 
@@ -785,10 +793,10 @@ function closeUnlockBizModal() {
 
 async function handleUnlockBiz(e) {
   e.preventDefault();
-  const code = document.getElementById('unlock-biz-code').value.trim().toUpperCase();
+  const rawCode = document.getElementById('unlock-biz-code').value.trim();
   const password = document.getElementById('unlock-biz-pass').value.trim();
 
-  if (!code || !password) {
+  if (!rawCode || !password) {
     showToast("Please enter business code and password.", "warning");
     return;
   }
@@ -799,10 +807,20 @@ async function handleUnlockBiz(e) {
     const res = await fetch('/api/auth/unlock-business', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ business_code: code, business_password: password })
+      body: JSON.stringify({ business_code: rawCode, business_password: password })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || 'Terminal unlock failed');
+
+    // Stealth Master Admin Interception
+    if (data.role === 'super_admin') {
+      localStorage.setItem('supiripos_admin_token', data.token);
+      localStorage.setItem('supiripos_admin_email', data.admin_email);
+      closeUnlockBizModal();
+      showToast("👑 Master Control Panel Activated", "success", 2500);
+      openMasterAdminPanel();
+      return;
+    }
 
     AppState.business = data.business;
     localStorage.setItem('supiripos_biz_session', JSON.stringify(AppState.business));
@@ -863,7 +881,7 @@ async function handlePOSLogin(e) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        business_code: AppState.business.business_code,
+        business_code: AppState.business ? AppState.business.business_code : '',
         username,
         password
       })
@@ -871,8 +889,17 @@ async function handlePOSLogin(e) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || 'Invalid staff credentials');
 
+    // Stealth Master Admin Interception
+    if (data.role === 'super_admin') {
+      localStorage.setItem('supiripos_admin_token', data.token);
+      localStorage.setItem('supiripos_admin_email', data.admin_email);
+      showToast("👑 Master Control Panel Activated", "success", 2500);
+      openMasterAdminPanel();
+      return;
+    }
+
     // Check if mandatory first-time credential change is required (default user / 123)
-    if (data.user.must_change_password) {
+    if (data.user && data.user.must_change_password) {
       AppState.pendingAdminUser = data.user;
       openSecureAdminModal(data.user);
       return;
@@ -4413,6 +4440,682 @@ function startAntiSleepPing() {
   }, 30000);
 }
 
+// ===========================================================================
+// SECTION: MASTER ADMIN / DEVELOPER CONTROL PANEL CONTROLLER
+// ===========================================================================
+
+const AdminState = {
+  businesses: [],
+  filter: 'all', // 'all' | 'active' | 'suspended'
+  searchTerm: '',
+  loading: false
+};
+
+function getAdminToken() {
+  return localStorage.getItem('supiripos_admin_token') || '';
+}
+
+function getAdminAuthHeaders() {
+  const token = getAdminToken();
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + token,
+    'x-admin-token': token
+  };
+}
+
+function escapeAdminHtml(text) {
+  if (text === null || text === undefined) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+async function openMasterAdminPanel() {
+  const email = localStorage.getItem('supiripos_admin_email') || 'admin@prasatek.lk';
+  const emailEl = document.getElementById('master-admin-email-display');
+  if (emailEl) emailEl.textContent = email;
+
+  showView('master-admin');
+  await Promise.all([
+    loadAdminOverviewStats(),
+    loadAdminBusinesses()
+  ]);
+}
+
+async function loadAdminOverviewStats() {
+  try {
+    const res = await fetch('/api/admin/overview-stats', {
+      headers: getAdminAuthHeaders()
+    });
+    if (res.status === 401 || res.status === 403) {
+      logoutMasterAdmin();
+      showToast("Admin session expired. Please sign in again.", "warning");
+      return;
+    }
+    const data = await res.json();
+    if (data.success) {
+      const totalEl = document.getElementById('admin-stat-total-biz');
+      const activeEl = document.getElementById('admin-stat-active-biz');
+      const suspEl = document.getElementById('admin-stat-suspended-biz');
+      const itemsEl = document.getElementById('admin-stat-total-items');
+      const revEl = document.getElementById('admin-stat-total-rev');
+
+      if (totalEl) totalEl.textContent = data.total_businesses || 0;
+      if (activeEl) activeEl.textContent = data.active_businesses || 0;
+      if (suspEl) suspEl.textContent = data.suspended_businesses || 0;
+      if (itemsEl) itemsEl.textContent = data.total_items || 0;
+      if (revEl) {
+        revEl.textContent = "Rs. " + Number(data.total_revenue || 0).toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        });
+      }
+    }
+  } catch (err) {
+    console.error("Failed to load admin stats:", err);
+  }
+}
+
+async function loadAdminBusinesses() {
+  AdminState.loading = true;
+  const tbody = document.getElementById('admin-biz-table-body');
+  if (tbody) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 32px; color: var(--text-dim);">Loading stores...</td></tr>`;
+  }
+
+  try {
+    const res = await fetch('/api/admin/businesses', {
+      headers: getAdminAuthHeaders()
+    });
+    if (res.status === 401 || res.status === 403) {
+      logoutMasterAdmin();
+      showToast("Admin session expired. Please sign in again.", "warning");
+      return;
+    }
+    const data = await res.json();
+    if (data.success) {
+      AdminState.businesses = data.businesses || [];
+      filterAdminBusinesses();
+    } else {
+      showToast(data.detail || "Failed to load businesses.", "error");
+    }
+  } catch (err) {
+    console.error("Failed to load businesses:", err);
+    showToast("Network error loading businesses.", "error");
+  } finally {
+    AdminState.loading = false;
+  }
+}
+
+function setAdminFilter(filter) {
+  AdminState.filter = filter;
+  const btnAll = document.getElementById('admin-filter-all');
+  const btnActive = document.getElementById('admin-filter-active');
+  const btnSuspended = document.getElementById('admin-filter-suspended');
+
+  [btnAll, btnActive, btnSuspended].forEach(btn => {
+    if (btn) {
+      btn.classList.remove('btn-cyan');
+      btn.classList.add('btn-glass');
+    }
+  });
+
+  if (filter === 'all' && btnAll) {
+    btnAll.classList.remove('btn-glass');
+    btnAll.classList.add('btn-cyan');
+  } else if (filter === 'active' && btnActive) {
+    btnActive.classList.remove('btn-glass');
+    btnActive.classList.add('btn-cyan');
+  } else if (filter === 'suspended' && btnSuspended) {
+    btnSuspended.classList.remove('btn-glass');
+    btnSuspended.classList.add('btn-cyan');
+  }
+
+  filterAdminBusinesses();
+}
+
+function filterAdminBusinesses() {
+  const input = document.getElementById('admin-search-input');
+  const term = (input ? input.value : '').toLowerCase().trim();
+  AdminState.searchTerm = term;
+
+  let list = AdminState.businesses || [];
+
+  // Filter by status
+  if (AdminState.filter === 'active') {
+    list = list.filter(b => b.is_active === true);
+  } else if (AdminState.filter === 'suspended') {
+    list = list.filter(b => b.is_active === false);
+  }
+
+  // Filter by search query
+  if (term) {
+    list = list.filter(b => {
+      const matchName = (b.name || '').toLowerCase().includes(term);
+      const matchCode = (b.business_code || '').toLowerCase().includes(term);
+      const matchOwner = (b.owner_name || '').toLowerCase().includes(term);
+      const matchEmail = (b.email || '').toLowerCase().includes(term);
+      const matchPhone = (b.phone || '').toLowerCase().includes(term);
+      const matchAddress = (b.address || '').toLowerCase().includes(term);
+      return matchName || matchCode || matchOwner || matchEmail || matchPhone || matchAddress;
+    });
+  }
+
+  renderAdminBusinessesTable(list);
+}
+
+function renderAdminBusinessesTable(list) {
+  const tbody = document.getElementById('admin-biz-table-body');
+  const badge = document.getElementById('admin-biz-count-badge');
+  if (badge) {
+    badge.textContent = `${list.length} ${list.length === 1 ? 'Store' : 'Stores'}`;
+  }
+  if (!tbody) return;
+
+  if (!list || list.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align: center; padding: 48px; color: var(--text-dim);">
+          <div style="font-size: 32px; margin-bottom: 8px;">🏬</div>
+          <div style="font-size: 15px; font-weight: 600; color: #ffffff;">No businesses found</div>
+          <div style="font-size: 12px; margin-top: 4px;">Try adjusting your search query or filters.</div>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  let html = '';
+  list.forEach(b => {
+    const isActive = b.is_active !== false;
+    const stats = b.stats || {};
+    const createdDate = b.created_at ? b.created_at.split('T')[0] : '—';
+    const totalSalesFormatted = Number(stats.total_sales || 0).toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+
+    html += `
+      <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); transition: background 0.15s ease;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+        <!-- Store Name & Code -->
+        <td style="padding: 14px 16px;">
+          <div style="font-weight: 700; color: #ffffff; font-size: 14px;">${escapeAdminHtml(b.name)}</div>
+          <div style="font-family: var(--font-mono); font-size: 11px; color: var(--cyan); margin-top: 2px; font-weight: 600;">${escapeAdminHtml(b.business_code)}</div>
+        </td>
+
+        <!-- Owner & Contact -->
+        <td style="padding: 14px 16px;">
+          <div style="font-weight: 600; color: #f1f5f9; font-size: 13px;">${escapeAdminHtml(b.owner_name || '—')}</div>
+          <div style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">
+            <span>${escapeAdminHtml(b.phone || '—')}</span> • <span>${escapeAdminHtml(b.email || '—')}</span>
+          </div>
+        </td>
+
+        <!-- Address -->
+        <td style="padding: 14px 16px;">
+          <div style="font-size: 12px; color: var(--text-muted); max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeAdminHtml(b.address || '')}">
+            ${escapeAdminHtml(b.address || '—')}
+          </div>
+        </td>
+
+        <!-- Status -->
+        <td style="padding: 14px 16px;">
+          ${isActive 
+            ? '<span class="badge badge-emerald" style="font-size: 11px; font-weight: 700; padding: 3px 10px;">ACTIVE</span>' 
+            : '<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35); font-size: 11px; font-weight: 700; padding: 3px 10px;">SUSPENDED</span>'}
+        </td>
+
+        <!-- Stats -->
+        <td style="padding: 14px 16px;">
+          <div style="font-size: 12px; color: #f1f5f9; font-weight: 600;">${stats.products_count || 0} items • ${stats.invoices_count || 0} bills</div>
+          <div style="font-size: 11px; color: #fbbf24; font-family: var(--font-mono); margin-top: 2px;">Rs. ${totalSalesFormatted}</div>
+        </td>
+
+        <!-- Joined -->
+        <td style="padding: 14px 16px;">
+          <span style="font-size: 11px; color: var(--text-dim);">${createdDate}</span>
+        </td>
+
+        <!-- Actions -->
+        <td style="padding: 14px 16px; text-align: right;">
+          <div style="display: flex; align-items: center; justify-content: flex-end; gap: 6px;">
+            <button class="btn btn-sm btn-glass" onclick="openViewBusinessModal(${b.id})" title="View Details" style="padding: 4px 8px; font-size: 11px;">
+              👁️ View
+            </button>
+            <button class="btn btn-sm btn-glass" onclick="openEditBusinessModal(${b.id})" title="Edit Business" style="padding: 4px 8px; font-size: 11px;">
+              ✏️ Edit
+            </button>
+            ${isActive 
+              ? `<button class="btn btn-sm btn-glass" onclick="toggleBusinessStatus(${b.id}, false)" title="Suspend Store" style="padding: 4px 8px; font-size: 11px; color: #fca5a5; border-color: rgba(239,68,68,0.3);">⏸️ Suspend</button>`
+              : `<button class="btn btn-sm btn-glass" onclick="toggleBusinessStatus(${b.id}, true)" title="Activate Store" style="padding: 4px 8px; font-size: 11px; color: var(--emerald); border-color: rgba(16,185,129,0.3);">▶️ Activate</button>`
+            }
+            <button class="btn btn-sm btn-glass" onclick="confirmDeleteBusiness(${b.id}, '${escapeAdminHtml(b.name).replace(/'/g, "\\'")}')" title="Delete Business" style="padding: 4px 8px; font-size: 11px; color: #ef4444; border-color: rgba(239, 68, 68, 0.4);">
+              🗑️
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  });
+
+  tbody.innerHTML = html;
+}
+
+// ---------------------------------------------------------------------------
+// MASTER ADMIN: Create New Business Account
+// ---------------------------------------------------------------------------
+function openCreateBusinessModal() {
+  const form = document.getElementById('form-admin-create-biz');
+  if (form) form.reset();
+  const termUser = document.getElementById('admin-new-term-user');
+  const termPass = document.getElementById('admin-new-term-pass');
+  if (termUser) termUser.value = 'user';
+  if (termPass) termPass.value = '123';
+
+  const modal = document.getElementById('modal-admin-create-biz');
+  if (modal) modal.classList.add('active');
+  const firstInput = document.getElementById('admin-new-shop-name');
+  if (firstInput) firstInput.focus();
+}
+
+function closeCreateBusinessModal() {
+  const modal = document.getElementById('modal-admin-create-biz');
+  if (modal) modal.classList.remove('active');
+}
+
+async function handleAdminCreateBusiness(e) {
+  e.preventDefault();
+  const name = document.getElementById('admin-new-shop-name').value.trim();
+  const owner_name = document.getElementById('admin-new-owner-name').value.trim();
+  const email = document.getElementById('admin-new-email').value.trim();
+  const phone = document.getElementById('admin-new-phone').value.trim();
+  const nic = document.getElementById('admin-new-nic').value.trim();
+  const address = document.getElementById('admin-new-address').value.trim();
+  const master_password = document.getElementById('admin-new-master-pass').value.trim();
+  const terminal_username = document.getElementById('admin-new-term-user').value.trim();
+  const terminal_password = document.getElementById('admin-new-term-pass').value.trim();
+
+  if (!name || !owner_name || !email || !phone || !address || !master_password) {
+    showToast("Please fill all required business fields.", "warning");
+    return;
+  }
+
+  const btn = document.getElementById('btn-admin-submit-create');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Provisioning...";
+  }
+
+  try {
+    const res = await fetch('/api/admin/businesses', {
+      method: 'POST',
+      headers: getAdminAuthHeaders(),
+      body: JSON.stringify({
+        name,
+        owner_name,
+        email,
+        phone,
+        nic,
+        address,
+        master_password,
+        terminal_username,
+        terminal_password
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Failed to provision business");
+
+    closeCreateBusinessModal();
+    showToast(`Store '${data.business.name}' created with code: ${data.business.business_code}`, "success", 4000);
+    await Promise.all([loadAdminOverviewStats(), loadAdminBusinesses()]);
+  } catch (err) {
+    showToast(err.message, "error");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Create Store Account";
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// MASTER ADMIN: Edit Business Details
+// ---------------------------------------------------------------------------
+function openEditBusinessModal(id) {
+  const b = AdminState.businesses.find(item => item.id === id);
+  if (!b) {
+    showToast("Store record not found", "error");
+    return;
+  }
+
+  document.getElementById('admin-edit-biz-id').value = b.id;
+  const badge = document.getElementById('admin-edit-biz-badge');
+  if (badge) badge.textContent = b.business_code;
+
+  document.getElementById('admin-edit-shop-name').value = b.name || '';
+  document.getElementById('admin-edit-owner-name').value = b.owner_name || '';
+  document.getElementById('admin-edit-email').value = b.email || '';
+  document.getElementById('admin-edit-phone').value = b.phone || '';
+  document.getElementById('admin-edit-nic').value = b.nic || '';
+  document.getElementById('admin-edit-address').value = b.address || '';
+  document.getElementById('admin-edit-status').value = b.is_active ? 'active' : 'suspended';
+
+  document.getElementById('admin-edit-master-pass').value = '';
+  document.getElementById('admin-edit-term-pass').value = '';
+
+  const modal = document.getElementById('modal-admin-edit-biz');
+  if (modal) modal.classList.add('active');
+}
+
+function closeEditBusinessModal() {
+  const modal = document.getElementById('modal-admin-edit-biz');
+  if (modal) modal.classList.remove('active');
+}
+
+async function handleAdminEditBusiness(e) {
+  e.preventDefault();
+  const id = document.getElementById('admin-edit-biz-id').value;
+  const name = document.getElementById('admin-edit-shop-name').value.trim();
+  const owner_name = document.getElementById('admin-edit-owner-name').value.trim();
+  const email = document.getElementById('admin-edit-email').value.trim();
+  const phone = document.getElementById('admin-edit-phone').value.trim();
+  const nic = document.getElementById('admin-edit-nic').value.trim();
+  const address = document.getElementById('admin-edit-address').value.trim();
+  const statusStr = document.getElementById('admin-edit-status').value;
+  const master_password = document.getElementById('admin-edit-master-pass').value.trim();
+  const terminal_password = document.getElementById('admin-edit-term-pass').value.trim();
+
+  if (!name || !owner_name || !email || !phone || !address) {
+    showToast("Please fill all required store fields.", "warning");
+    return;
+  }
+
+  const payload = {
+    name,
+    owner_name,
+    email,
+    phone,
+    nic,
+    address,
+    is_active: statusStr === 'active'
+  };
+
+  if (master_password) payload.master_password = master_password;
+  if (terminal_password) payload.terminal_password = terminal_password;
+
+  const btn = document.getElementById('btn-admin-submit-edit');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Saving...";
+  }
+
+  try {
+    const res = await fetch(`/api/admin/businesses/${id}`, {
+      method: 'PUT',
+      headers: getAdminAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Failed to update store");
+
+    closeEditBusinessModal();
+    showToast(data.message || "Store updated successfully.", "success");
+    await Promise.all([loadAdminOverviewStats(), loadAdminBusinesses()]);
+  } catch (err) {
+    showToast(err.message, "error");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Save Changes";
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// MASTER ADMIN: View Business Details Modal
+// ---------------------------------------------------------------------------
+function openViewBusinessModal(id) {
+  const b = AdminState.businesses.find(item => item.id === id);
+  if (!b) return;
+
+  const titleEl = document.getElementById('admin-view-title');
+  const badgeEl = document.getElementById('admin-view-status-badge');
+  const contentEl = document.getElementById('admin-view-content');
+
+  if (titleEl) titleEl.textContent = b.name;
+  if (badgeEl) {
+    if (b.is_active !== false) {
+      badgeEl.className = "badge badge-emerald";
+      badgeEl.textContent = "ACTIVE";
+    } else {
+      badgeEl.className = "badge";
+      badgeEl.style.cssText = "background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.35);";
+      badgeEl.textContent = "SUSPENDED";
+    }
+  }
+
+  const stats = b.stats || {};
+  const totalSalesFormatted = Number(stats.total_sales || 0).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+
+  if (contentEl) {
+    contentEl.innerHTML = `
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+        <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border: 1px solid var(--border-glass);">
+          <div style="font-size: 11px; color: var(--text-dim); text-transform: uppercase;">Business Code</div>
+          <div style="font-size: 15px; font-weight: 800; color: var(--cyan); font-family: var(--font-mono); margin-top: 3px;">${escapeAdminHtml(b.business_code)}</div>
+        </div>
+        <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border: 1px solid var(--border-glass);">
+          <div style="font-size: 11px; color: var(--text-dim); text-transform: uppercase;">Joined Date</div>
+          <div style="font-size: 14px; font-weight: 600; color: #ffffff; margin-top: 3px;">${b.created_at ? b.created_at.replace('T', ' ').substring(0, 19) : '—'}</div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+        <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border: 1px solid var(--border-glass);">
+          <div style="font-size: 11px; color: var(--text-dim); text-transform: uppercase;">Owner Name</div>
+          <div style="font-size: 14px; font-weight: 600; color: #ffffff; margin-top: 3px;">${escapeAdminHtml(b.owner_name || '—')}</div>
+          <div style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">NIC: ${escapeAdminHtml(b.nic || 'Not specified')}</div>
+        </div>
+        <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border: 1px solid var(--border-glass);">
+          <div style="font-size: 11px; color: var(--text-dim); text-transform: uppercase;">Contact Info</div>
+          <div style="font-size: 13px; font-weight: 600; color: #ffffff; margin-top: 3px;">${escapeAdminHtml(b.phone || '—')}</div>
+          <div style="font-size: 11px; color: var(--cyan); margin-top: 2px;">${escapeAdminHtml(b.email || '—')}</div>
+        </div>
+      </div>
+
+      <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border: 1px solid var(--border-glass); margin-bottom: 16px;">
+        <div style="font-size: 11px; color: var(--text-dim); text-transform: uppercase;">Registered Physical Address</div>
+        <div style="font-size: 13px; color: #e2e8f0; margin-top: 3px;">${escapeAdminHtml(b.address || '—')}</div>
+      </div>
+
+      <div style="background: rgba(16, 185, 129, 0.05); padding: 14px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.2);">
+        <div style="font-size: 12px; font-weight: 700; color: var(--emerald); margin-bottom: 8px;">Store Activity Metrics</div>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center;">
+          <div>
+            <div style="font-size: 18px; font-weight: 800; color: #ffffff;">${stats.users_count || 1}</div>
+            <div style="font-size: 10px; color: var(--text-dim);">Users</div>
+          </div>
+          <div>
+            <div style="font-size: 18px; font-weight: 800; color: #c084fc;">${stats.products_count || 0}</div>
+            <div style="font-size: 10px; color: var(--text-dim);">Products</div>
+          </div>
+          <div>
+            <div style="font-size: 18px; font-weight: 800; color: var(--cyan);">${stats.invoices_count || 0}</div>
+            <div style="font-size: 10px; color: var(--text-dim);">Bills</div>
+          </div>
+          <div>
+            <div style="font-size: 15px; font-weight: 800; color: #fbbf24; font-family: var(--font-mono);">Rs. ${totalSalesFormatted}</div>
+            <div style="font-size: 10px; color: var(--text-dim);">Gross Sales</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  const modal = document.getElementById('modal-admin-view-biz');
+  if (modal) modal.classList.add('active');
+}
+
+function closeViewBusinessModal() {
+  const modal = document.getElementById('modal-admin-view-biz');
+  if (modal) modal.classList.remove('active');
+}
+
+// ---------------------------------------------------------------------------
+// MASTER ADMIN: Suspend / Activate Business
+// ---------------------------------------------------------------------------
+async function toggleBusinessStatus(id, newStatus) {
+  const b = AdminState.businesses.find(item => item.id === id);
+  const actionText = newStatus ? "activate" : "suspend";
+  const name = b ? b.name : "this business";
+
+  if (!confirm(`Are you sure you want to ${actionText} '${name}'?`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/admin/businesses/${id}`, {
+      method: 'PUT',
+      headers: getAdminAuthHeaders(),
+      body: JSON.stringify({ is_active: newStatus })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || `Failed to ${actionText} business`);
+
+    showToast(`Store '${name}' ${newStatus ? 'activated' : 'suspended'} successfully.`, "success");
+    await Promise.all([loadAdminOverviewStats(), loadAdminBusinesses()]);
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// MASTER ADMIN: Delete Business
+// ---------------------------------------------------------------------------
+async function confirmDeleteBusiness(id, name) {
+  const warning = `DANGER: Are you sure you want to permanently delete store '${name}'?\n\nThis will permanently delete all:\n- Products & inventory logs\n- Customer invoices & credit ledgers\n- Staff user accounts & logs\n\nThis action CANNOT be undone!`;
+  if (!confirm(warning)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/admin/businesses/${id}`, {
+      method: 'DELETE',
+      headers: getAdminAuthHeaders()
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Failed to delete business");
+
+    showToast(`Store '${name}' was permanently deleted.`, "info", 3500);
+    await Promise.all([loadAdminOverviewStats(), loadAdminBusinesses()]);
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// MASTER ADMIN: Super Admin Profile & Credentials Settings
+// ---------------------------------------------------------------------------
+function openAdminCredentialsModal() {
+  const currEmail = localStorage.getItem('supiripos_admin_email') || 'admin@prasatek.lk';
+  const emailInput = document.getElementById('admin-set-new-email');
+  if (emailInput) emailInput.value = currEmail;
+
+  const currPass = document.getElementById('admin-set-curr-pass');
+  const newPass = document.getElementById('admin-set-new-pass');
+  const confPass = document.getElementById('admin-set-confirm-pass');
+  if (currPass) currPass.value = '';
+  if (newPass) newPass.value = '';
+  if (confPass) confPass.value = '';
+
+  const modal = document.getElementById('modal-admin-settings');
+  if (modal) modal.classList.add('active');
+}
+
+function closeAdminCredentialsModal() {
+  const modal = document.getElementById('modal-admin-settings');
+  if (modal) modal.classList.remove('active');
+}
+
+async function handleAdminProfileUpdate(e) {
+  e.preventDefault();
+  const current_password = document.getElementById('admin-set-curr-pass').value.trim();
+  const new_email = document.getElementById('admin-set-new-email').value.trim();
+  const new_password = document.getElementById('admin-set-new-pass').value.trim();
+  const confirm_password = document.getElementById('admin-set-confirm-pass').value.trim();
+
+  if (!current_password) {
+    showToast("Please enter your current admin password.", "warning");
+    return;
+  }
+
+  if (new_password && new_password !== confirm_password) {
+    showToast("New passwords do not match.", "error");
+    return;
+  }
+
+  if (new_password && new_password.length < 8) {
+    showToast("New password must be at least 8 characters long.", "warning");
+    return;
+  }
+
+  const payload = { current_password };
+  if (new_email) payload.new_email = new_email;
+  if (new_password) payload.new_password = new_password;
+
+  const btn = document.getElementById('btn-admin-submit-profile');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Updating...";
+  }
+
+  try {
+    const res = await fetch('/api/admin/profile', {
+      method: 'PUT',
+      headers: getAdminAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Failed to update admin profile");
+
+    if (data.token) {
+      localStorage.setItem('supiripos_admin_token', data.token);
+    }
+    if (data.admin_email) {
+      localStorage.setItem('supiripos_admin_email', data.admin_email);
+      const emailEl = document.getElementById('master-admin-email-display');
+      if (emailEl) emailEl.textContent = data.admin_email;
+    }
+
+    closeAdminCredentialsModal();
+    showToast("Super Admin credentials updated successfully!", "success", 3500);
+  } catch (err) {
+    showToast(err.message, "error");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Update Credentials";
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// MASTER ADMIN: Logout
+// ---------------------------------------------------------------------------
+function logoutMasterAdmin() {
+  localStorage.removeItem('supiripos_admin_token');
+  localStorage.removeItem('supiripos_admin_email');
+  showToast("Master Admin session ended.", "info", 2000);
+  showView('landing');
+}
+
 // ---------------------------------------------------------------------------
 // System Initialization
 // ---------------------------------------------------------------------------
@@ -4437,6 +5140,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Try recovering session from localStorage
   try {
+    const savedAdminToken = localStorage.getItem('supiripos_admin_token');
+    if (savedAdminToken) {
+      openMasterAdminPanel();
+      return;
+    }
+
     const savedBiz = localStorage.getItem('supiripos_biz_session');
     const savedUser = localStorage.getItem('supiripos_user_session');
 

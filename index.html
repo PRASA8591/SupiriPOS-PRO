@@ -933,6 +933,165 @@
 
 
   <!-- ========================================================================= -->
+  <!-- VIEW 2.5: MASTER ADMIN / DEVELOPER CONTROL PANEL (HIDDEN BY DEFAULT)        -->
+  <!-- ========================================================================= -->
+  <div id="view-master-admin"
+    style="display: none; min-height: 100vh; background: #060b13; color: #f8fafc; font-family: var(--font-sans); width: 100%; box-sizing: border-box;">
+
+    <!-- Top Admin Header -->
+    <header
+      style="width: 100%; min-height: 60px; padding: 10px 28px; border-bottom: 1px solid rgba(16, 185, 129, 0.25); background: rgba(11, 17, 32, 0.95); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: space-between; gap: 14px; position: sticky; top: 0; z-index: 100; box-sizing: border-box;">
+      
+      <!-- Brand & Status -->
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <img src="/assets/logo.png" alt="SupiriPOS PRO" style="width: 38px; height: 38px; object-fit: contain;">
+        <div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 18px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px;">SupiriPOS <span style="color: var(--cyan);">PRO</span></span>
+            <span class="badge badge-cyan" style="font-size: 10px; font-weight: 800; letter-spacing: 0.5px; border: 1px solid var(--cyan); padding: 2px 8px;">👑 MASTER CONTROL PANEL</span>
+          </div>
+          <div style="font-size: 11px; color: var(--text-dim); margin-top: 1px;">PrasaTek System Solutions Cloud Multi-Tenant Orchestrator</div>
+        </div>
+      </div>
+
+      <!-- Cloud Status Badge -->
+      <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--emerald); background: rgba(16, 185, 129, 0.08); padding: 5px 14px; border-radius: 20px; border: 1px solid var(--border-accent);">
+        <span class="status-dot"></span>
+        <span>SUPABASE CLOUD ONLINE</span>
+      </div>
+
+      <!-- Admin Actions -->
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span id="master-admin-email-display"
+          style="background: rgba(255, 255, 255, 0.06); padding: 6px 14px; border-radius: 20px; font-size: 12px; color: #e2e8f0; border: 1px solid var(--border-glass); font-family: var(--font-mono);">
+          admin@prasatek.lk
+        </span>
+        <button class="btn btn-sm btn-glass" onclick="openAdminCredentialsModal()" style="display: flex; align-items: center; gap: 6px;">
+          <span>⚙️ Security</span>
+        </button>
+        <button class="btn btn-sm btn-glass" onclick="returnToLanding()" style="display: flex; align-items: center; gap: 6px;" title="Exit to Public Landing Page">
+          <span>🌐 Landing</span>
+        </button>
+        <button class="btn btn-sm btn-danger" onclick="logoutMasterAdmin()" style="display: flex; align-items: center; gap: 6px;">
+          <span>🚪 Logout</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Admin Dashboard Content -->
+    <main style="padding: 28px 32px; max-width: 1440px; margin: 0 auto; width: 100%; box-sizing: border-box;">
+
+      <!-- Hero Header & Provision Button -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+        <div>
+          <h1 style="font-size: 26px; font-weight: 800; color: #ffffff; margin: 0 0 6px 0; display: flex; align-items: center; gap: 10px;">
+            Enterprise Multi-Tenant Stores
+          </h1>
+          <p style="margin: 0; font-size: 13px; color: var(--text-muted);">
+            Manage registered business accounts, provision new cloud databases, monitor inventories, and control platform access.
+          </p>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <button class="btn btn-glass" onclick="loadAdminBusinesses()" style="display: flex; align-items: center; gap: 6px;">
+            <span>🔄 Refresh</span>
+          </button>
+          <button class="btn btn-emerald btn-lg" onclick="openCreateBusinessModal()" style="display: flex; align-items: center; gap: 8px; box-shadow: 0 0 20px rgba(16, 185, 129, 0.35);">
+            <span>➕ Provision New Business</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 5 Overview Stat Cards -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px;">
+        
+        <div class="glass-panel" style="padding: 20px; border-left: 4px solid var(--cyan);">
+          <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Total Businesses</div>
+          <div id="admin-stat-total-biz" style="font-size: 32px; font-weight: 800; color: #ffffff; margin-top: 6px;">0</div>
+          <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">Registered on Cloud</div>
+        </div>
+
+        <div class="glass-panel" style="padding: 20px; border-left: 4px solid var(--emerald);">
+          <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Active Stores</div>
+          <div id="admin-stat-active-biz" style="font-size: 32px; font-weight: 800; color: var(--emerald); margin-top: 6px;">0</div>
+          <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">Live POS Terminals</div>
+        </div>
+
+        <div class="glass-panel" style="padding: 20px; border-left: 4px solid #ef4444;">
+          <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Suspended Stores</div>
+          <div id="admin-stat-suspended-biz" style="font-size: 32px; font-weight: 800; color: #ef4444; margin-top: 6px;">0</div>
+          <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">Access Blocked</div>
+        </div>
+
+        <div class="glass-panel" style="padding: 20px; border-left: 4px solid #a855f7;">
+          <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Cataloged Products</div>
+          <div id="admin-stat-total-items" style="font-size: 32px; font-weight: 800; color: #c084fc; margin-top: 6px;">0</div>
+          <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">Across All Stores</div>
+        </div>
+
+        <div class="glass-panel" style="padding: 20px; border-left: 4px solid #f59e0b;">
+          <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Gross Revenue</div>
+          <div id="admin-stat-total-rev" style="font-size: 26px; font-weight: 800; color: #fbbf24; margin-top: 8px; font-family: var(--font-mono);">Rs. 0.00</div>
+          <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">Enterprise Sales Volume</div>
+        </div>
+
+      </div>
+
+      <!-- Business Management Table Container -->
+      <div class="glass-panel" style="padding: 24px; border-radius: 16px;">
+        
+        <!-- Filter & Search Toolbar -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
+          
+          <div style="display: flex; align-items: center; gap: 12px; flex: 1; max-width: 500px;">
+            <input type="text" id="admin-search-input" class="form-control"
+              placeholder="🔍 Search store name, code, owner, phone, email..."
+              oninput="filterAdminBusinesses()"
+              style="padding: 10px 14px; font-size: 13px;">
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="display: flex; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 8px; padding: 3px;">
+              <button id="admin-filter-all" class="btn btn-sm btn-cyan" onclick="setAdminFilter('all')" style="border-radius: 6px; padding: 4px 12px;">All</button>
+              <button id="admin-filter-active" class="btn btn-sm btn-glass" onclick="setAdminFilter('active')" style="border-radius: 6px; padding: 4px 12px;">Active</button>
+              <button id="admin-filter-suspended" class="btn btn-sm btn-glass" onclick="setAdminFilter('suspended')" style="border-radius: 6px; padding: 4px 12px;">Suspended</button>
+            </div>
+            <span id="admin-biz-count-badge" class="badge badge-cyan" style="font-size: 12px; padding: 6px 12px;">0 Stores</span>
+          </div>
+
+        </div>
+
+        <!-- Table View -->
+        <div style="overflow-x: auto; max-width: 100%;">
+          <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+            <thead>
+              <tr style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted); background: rgba(0,0,0,0.25);">
+                <th style="padding: 12px 14px;">Store Code &amp; Status</th>
+                <th style="padding: 12px 14px;">Business / Store Name</th>
+                <th style="padding: 12px 14px;">Owner &amp; Contact</th>
+                <th style="padding: 12px 14px;">Terminal Login</th>
+                <th style="padding: 12px 14px;">Inventory &amp; Invoices</th>
+                <th style="padding: 12px 14px;">Registered</th>
+                <th style="padding: 12px 14px; text-align: right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="admin-biz-table-body">
+              <tr>
+                <td colspan="7" style="padding: 30px; text-align: center; color: var(--text-muted);">
+                  Loading enterprise businesses...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+    </main>
+
+  </div>
+
+
+  <!-- ========================================================================= -->
   <!-- VIEW 3: MAIN POS WORKSPACE (THE 5 CORE PAGES)                              -->
   <!-- ========================================================================= -->
   <div id="view-workspace"
@@ -2148,6 +2307,241 @@
 
 
   <!-- ========================================================================= -->
+  <!-- MODAL: MASTER ADMIN - PROVISION NEW STORE ACCOUNT                         -->
+  <!-- ========================================================================= -->
+  <div id="modal-admin-create-biz" class="modal-backdrop">
+    <div class="modal-card glass-panel" style="max-width: 580px; border-color: rgba(16, 185, 129, 0.4);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <h3 style="font-size: 18px; font-weight: 800; color: #ffffff;">➕ Provision New Store Account</h3>
+          <span class="badge badge-emerald">MASTER PROVISIONING</span>
+        </div>
+        <button class="btn btn-sm btn-glass" onclick="closeCreateBusinessModal()">✕</button>
+      </div>
+
+      <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 18px;">
+        Create a new multi-tenant store on Supabase PostgreSQL. Store code will be auto-generated sequentially.
+      </p>
+
+      <form id="form-admin-create-biz" onsubmit="handleAdminCreateBusiness(event)" autocomplete="off">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label">Store / Shop Name *</label>
+            <input type="text" id="admin-new-shop-name" class="form-control" placeholder="e.g. Royal Super City" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Owner Full Name *</label>
+            <input type="text" id="admin-new-owner-name" class="form-control" placeholder="e.g. Kamal Perera" required>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label">Owner Email *</label>
+            <input type="email" id="admin-new-email" class="form-control" placeholder="owner@store.lk" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Mobile / WhatsApp *</label>
+            <input type="tel" id="admin-new-phone" class="form-control" placeholder="+94 77 123 4567" required>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label">NIC / Business Reg No</label>
+            <input type="text" id="admin-new-nic" class="form-control" placeholder="e.g. 199012345678">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Store Master Password *</label>
+            <input type="password" id="admin-new-master-pass" class="form-control" placeholder="Create strong master pass" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Store Physical Address *</label>
+          <input type="text" id="admin-new-address" class="form-control" placeholder="e.g. No 45, Galle Road, Colombo 03" required>
+        </div>
+
+        <div style="background: rgba(6, 182, 212, 0.08); border: 1px solid rgba(6, 182, 212, 0.25); border-radius: 10px; padding: 14px; margin: 12px 0;">
+          <div style="font-size: 12px; font-weight: 700; color: var(--cyan); margin-bottom: 8px;">Initial Terminal Login Credentials:</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">Cashier Username</label>
+              <input type="text" id="admin-new-term-user" class="form-control" value="user" required>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">Cashier Password</label>
+              <input type="text" id="admin-new-term-pass" class="form-control" value="123" required>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px;">
+          <button type="button" class="btn btn-glass" onclick="closeCreateBusinessModal()">Cancel</button>
+          <button type="submit" id="btn-admin-submit-create" class="btn btn-emerald btn-lg">
+            🚀 Provision Store
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: MASTER ADMIN - EDIT STORE DETAILS                                  -->
+  <!-- ========================================================================= -->
+  <div id="modal-admin-edit-biz" class="modal-backdrop">
+    <div class="modal-card glass-panel" style="max-width: 580px; border-color: rgba(6, 182, 212, 0.4);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <h3 style="font-size: 18px; font-weight: 800; color: #ffffff;">✏️ Edit Business Store</h3>
+          <span id="admin-edit-biz-badge" class="badge badge-cyan">PT-00000</span>
+        </div>
+        <button class="btn btn-sm btn-glass" onclick="closeEditBusinessModal()">✕</button>
+      </div>
+
+      <form id="form-admin-edit-biz" onsubmit="handleAdminEditBusiness(event)" autocomplete="off">
+        <input type="hidden" id="admin-edit-biz-id">
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label">Store / Shop Name</label>
+            <input type="text" id="admin-edit-shop-name" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Owner Full Name</label>
+            <input type="text" id="admin-edit-owner-name" class="form-control" required>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label">Owner Email</label>
+            <input type="email" id="admin-edit-email" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Phone / WhatsApp</label>
+            <input type="tel" id="admin-edit-phone" class="form-control" required>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label">NIC / Business Reg No</label>
+            <input type="text" id="admin-edit-nic" class="form-control">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Account Status</label>
+            <select id="admin-edit-status" class="form-control">
+              <option value="true">🟢 Active (Full Access)</option>
+              <option value="false">🔴 Suspended (Access Blocked)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Physical Address</label>
+          <input type="text" id="admin-edit-address" class="form-control" required>
+        </div>
+
+        <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 10px; padding: 14px; margin: 12px 0;">
+          <div style="font-size: 12px; font-weight: 700; color: #fbbf24; margin-bottom: 8px;">🔑 Password Reset Overrides (Leave blank to keep unchanged):</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">Reset Master Password</label>
+              <input type="password" id="admin-edit-master-pass" class="form-control" placeholder="New master password">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">Reset Terminal Password</label>
+              <input type="text" id="admin-edit-term-pass" class="form-control" placeholder="New cashier password">
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px;">
+          <button type="button" class="btn btn-glass" onclick="closeEditBusinessModal()">Cancel</button>
+          <button type="submit" id="btn-admin-submit-edit" class="btn btn-cyan btn-lg">
+            💾 Save Changes
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: MASTER ADMIN - VIEW STORE DETAILS                                  -->
+  <!-- ========================================================================= -->
+  <div id="modal-admin-view-biz" class="modal-backdrop">
+    <div class="modal-card glass-panel" style="max-width: 600px; border-color: rgba(16, 185, 129, 0.4);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <h3 id="admin-view-title" style="font-size: 18px; font-weight: 800; color: #ffffff;">Store Overview</h3>
+          <span id="admin-view-status-badge" class="badge badge-emerald">ACTIVE</span>
+        </div>
+        <button class="btn btn-sm btn-glass" onclick="closeViewBusinessModal()">✕</button>
+      </div>
+
+      <div id="admin-view-content" style="font-size: 13px; line-height: 1.6;">
+        <!-- Populated dynamically by pos.js -->
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+        <button type="button" class="btn btn-glass" onclick="closeViewBusinessModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: MASTER ADMIN - SECURITY & CREDENTIALS SETTINGS                      -->
+  <!-- ========================================================================= -->
+  <div id="modal-admin-settings" class="modal-backdrop">
+    <div class="modal-card glass-panel" style="max-width: 460px; border-color: rgba(16, 185, 129, 0.4);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <h3 style="font-size: 18px; font-weight: 800; color: #ffffff;">⚙️ Super Admin Security</h3>
+        </div>
+        <button class="btn btn-sm btn-glass" onclick="closeAdminCredentialsModal()">✕</button>
+      </div>
+
+      <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 18px;">
+        Update your Master Admin credentials. All updates are persisted directly into the Supabase <code style="color:var(--emerald);">system_admins</code> table.
+      </p>
+
+      <form id="form-admin-settings" onsubmit="handleAdminProfileUpdate(event)" autocomplete="off">
+        <div class="form-group">
+          <label class="form-label">Super Admin Email (Username)</label>
+          <input type="email" id="admin-set-new-email" class="form-control" placeholder="admin@prasatek.lk" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Current Password (Required for verification) *</label>
+          <input type="password" id="admin-set-curr-pass" class="form-control" placeholder="Enter current password" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">New Password (Leave blank to keep current)</label>
+          <input type="password" id="admin-set-new-pass" class="form-control" placeholder="Enter new strong password (min 8 chars)">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Confirm New Password</label>
+          <input type="password" id="admin-set-confirm-pass" class="form-control" placeholder="Confirm new password">
+        </div>
+
+        <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+          <button type="button" class="btn btn-glass" onclick="closeAdminCredentialsModal()">Cancel</button>
+          <button type="submit" id="btn-admin-submit-profile" class="btn btn-emerald btn-lg">
+            🔒 Update Credentials
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ========================================================================= -->
   <!-- MODAL: STAGE 1 - BUSINESS TERMINAL UNLOCK                                  -->
   <!-- ========================================================================= -->
   <div id="modal-unlock-biz" class="modal-backdrop">
@@ -3047,7 +3441,7 @@
   <div id="printable-receipt-container"></div>
 
   <!-- Main POS Client-Side Controller -->
-  <script src="/assets/pos.js?v=20261115_instant_btn"></script>
+  <script src="/assets/pos.js?v=20261115_master_admin"></script>
 </body>
 
 </html>

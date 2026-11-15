@@ -10,6 +10,7 @@ import json
 import random
 import logging
 import hashlib
+import hmac
 import urllib.parse
 import threading
 import requests
@@ -179,7 +180,16 @@ class Business(Base):
     receipt_footer = Column(Text, default="Thank You! Come Again! / ස්තූතියි! නැවත එන්න!")
     logo_base64 = Column(Text, nullable=True)
     master_password_hash = Column(String(255), nullable=False)
+    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+class SystemAdmin(Base):
+    __tablename__ = "system_admins"
+    id = Column(Integer, primary_key=True, index=True)
+    admin_email = Column(String(150), unique=True, index=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 class POSUser(Base):
     __tablename__ = "pos_users"
@@ -296,7 +306,7 @@ try:
     Base.metadata.create_all(bind=engine)
     logger.info("[DB] All database tables verified / created successfully.")
     
-    # Safe column migration check for pos_users.must_change_password
+    # Safe column migration check for pos_users and businesses
     with engine.connect() as conn:
         try:
             if engine.dialect.name == "sqlite":
@@ -305,11 +315,18 @@ try:
                 if "must_change_password" not in cols:
                     conn.execute(text("ALTER TABLE pos_users ADD COLUMN must_change_password BOOLEAN DEFAULT 0"))
                     conn.commit()
+
+                b_res = conn.execute(text("PRAGMA table_info(businesses)")).fetchall()
+                b_cols = [r[1] for r in b_res]
+                if "is_active" not in b_cols:
+                    conn.execute(text("ALTER TABLE businesses ADD COLUMN is_active BOOLEAN DEFAULT 1"))
+                    conn.commit()
             else:
                 conn.execute(text("ALTER TABLE pos_users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT FALSE"))
+                conn.execute(text("ALTER TABLE businesses ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE"))
                 conn.commit()
         except Exception as mig_err:
-            logger.info(f"[DB] Migration check pos_users: {mig_err}")
+            logger.info(f"[DB] Migration check: {mig_err}")
 except Exception as e:
     logger.error(f"[DB ERROR] Error creating tables: {e}")
 
@@ -338,6 +355,55 @@ def hash_password(password: str) -> str:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return hash_password(plain_password) == hashed_password
+
+# ---------------------------------------------------------------------------
+# Super Admin Authentication & Signed Token Helpers
+# ---------------------------------------------------------------------------
+def generate_admin_token(admin_email: str) -> str:
+    clean_email = admin_email.strip().lower()
+    timestamp = int(datetime.now(timezone.utc).timestamp())
+    raw = f"{clean_email}:{timestamp}:{SECRET_KEY}"
+    sig = hashlib.sha256(raw.encode('utf-8')).hexdigest()
+    return f"{clean_email}:{timestamp}:{sig}"
+
+def verify_admin_token(token: str) -> Optional[str]:
+    try:
+        parts = token.split(":")
+        if len(parts) != 3:
+            return None
+        email, ts_str, sig = parts
+        ts = int(ts_str)
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        if now_ts - ts > 7 * 86400 or now_ts < ts - 60:
+            return None
+        raw = f"{email}:{ts_str}:{SECRET_KEY}"
+        expected_sig = hashlib.sha256(raw.encode('utf-8')).hexdigest()
+        if hmac.compare_digest(sig, expected_sig):
+            return email
+        return None
+    except Exception:
+        return None
+
+def get_current_admin(request: Request, db: Session = Depends(get_db)) -> SystemAdmin:
+    auth_header = request.headers.get("Authorization", "")
+    token = ""
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:].strip()
+    elif "x-admin-token" in request.headers:
+        token = request.headers["x-admin-token"].strip()
+
+    if not token:
+        raise HTTPException(status_code=401, detail="Unauthorized: Super Admin access required.")
+
+    admin_email = verify_admin_token(token)
+    if not admin_email:
+        raise HTTPException(status_code=401, detail="Invalid or expired Super Admin token.")
+
+    admin = db.query(SystemAdmin).filter(func.lower(SystemAdmin.admin_email) == admin_email.lower()).first()
+    if not admin:
+        raise HTTPException(status_code=401, detail="Super Admin account not found.")
+
+    return admin
 
 # ---------------------------------------------------------------------------
 # Real-Time WebSocket Multi-Device Synchronization Manager
@@ -616,10 +682,29 @@ def seed_demo_supermarket(db: Session):
     except Exception as seed_cr_err:
         logger.warning(f"[SEED CREDIT] {seed_cr_err}")
 
-# Initialize Demo Shop in DB
+def seed_system_admin(db: Session):
+    """
+    Ensures at least one Super Admin exists in system_admins table.
+    Default: admin@prasatek.lk / PrasaTek@2026
+    """
+    try:
+        count = db.query(SystemAdmin).count()
+        if count == 0:
+            default_admin = SystemAdmin(
+                admin_email="admin@prasatek.lk",
+                password_hash=hash_password("PrasaTek@2026")
+            )
+            db.add(default_admin)
+            db.commit()
+            logger.info("[ADMIN SEED] Default Super Admin account seeded: admin@prasatek.lk")
+    except Exception as e:
+        logger.warning(f"[ADMIN SEED WARNING] Could not seed default admin: {e}")
+
+# Initialize Demo Shop & Super Admin in DB
 try:
     with SessionLocal() as db_session:
         seed_demo_supermarket(db_session)
+        seed_system_admin(db_session)
 except Exception as seed_err:
     logger.warning(f"[SEED WARNING] Seed check: {seed_err}")
 
@@ -690,6 +775,40 @@ class POSLoginRequest(BaseModel):
     business_code: str
     username: str
     password: str
+
+class StealthLoginRequest(BaseModel):
+    username: str
+    password: str
+    business_code: Optional[str] = None
+
+class AdminCreateBusinessRequest(BaseModel):
+    name: str
+    owner_name: str
+    email: str
+    phone: str
+    address: str
+    master_password: str
+    nic: Optional[str] = ""
+    terminal_username: Optional[str] = "user"
+    terminal_password: Optional[str] = "123"
+    business_code: Optional[str] = None
+    is_active: Optional[bool] = True
+
+class AdminUpdateBusinessRequest(BaseModel):
+    name: Optional[str] = None
+    owner_name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    nic: Optional[str] = None
+    is_active: Optional[bool] = None
+    master_password: Optional[str] = None
+    terminal_password: Optional[str] = None
+
+class AdminProfileUpdateRequest(BaseModel):
+    new_email: Optional[str] = None
+    current_password: str
+    new_password: Optional[str] = None
 
 class ItemCreateUpdateRequest(BaseModel):
     business_code: str
@@ -1210,12 +1329,32 @@ def register_business(req: RegisterBusinessRequest, db: Session = Depends(get_db
 
 @app.post("/api/auth/unlock-business")
 def unlock_business(req: UnlockBusinessRequest, db: Session = Depends(get_db)):
-    """Stage 1: Business Terminal Unlock"""
-    code_clean = req.business_code.strip().upper()
+    """Stage 1: Business Terminal Unlock with Stealth Super Admin Interception"""
+    raw_input = req.business_code.strip()
+
+    # Stealth Super Admin Check
+    admin = db.query(SystemAdmin).filter(func.lower(SystemAdmin.admin_email) == raw_input.lower()).first()
+    if admin:
+        if verify_password(req.business_password, admin.password_hash):
+            return {
+                "status": "success",
+                "success": True,
+                "role": "super_admin",
+                "admin_email": admin.admin_email,
+                "token": generate_admin_token(admin.admin_email),
+                "message": "Super Admin authenticated"
+            }
+        else:
+            raise HTTPException(status_code=401, detail="Incorrect credentials.")
+
+    code_clean = raw_input.upper()
     biz = db.query(Business).filter(Business.business_code == code_clean).first()
 
     if not biz:
         raise HTTPException(status_code=404, detail="Business code not found. Please verify and try again.")
+
+    if getattr(biz, "is_active", True) is False:
+        raise HTTPException(status_code=403, detail="This business account has been suspended by system administration. Please contact PrasaTek Support.")
 
     if not verify_password(req.business_password, biz.master_password_hash):
         raise HTTPException(status_code=401, detail="Incorrect Business Master Password.")
@@ -1235,9 +1374,31 @@ def unlock_business(req: UnlockBusinessRequest, db: Session = Depends(get_db)):
 
 @app.post("/api/auth/pos-login")
 def pos_login(req: POSLoginRequest, db: Session = Depends(get_db)):
-    """Stage 2: POS Staff Login"""
+    """Stage 2: POS Staff Login with Stealth Super Admin Interception"""
+    raw_user = req.username.strip()
+
+    # Stealth Super Admin Check
+    admin = db.query(SystemAdmin).filter(func.lower(SystemAdmin.admin_email) == raw_user.lower()).first()
+    if admin:
+        if verify_password(req.password, admin.password_hash):
+            return {
+                "status": "success",
+                "success": True,
+                "role": "super_admin",
+                "admin_email": admin.admin_email,
+                "token": generate_admin_token(admin.admin_email),
+                "message": "Super Admin authenticated"
+            }
+        else:
+            raise HTTPException(status_code=401, detail="Incorrect credentials.")
+
     code_clean = req.business_code.strip().upper()
-    username_clean = req.username.strip().lower()
+    username_clean = raw_user.lower()
+
+    # Verify business is active
+    biz = db.query(Business).filter(Business.business_code == code_clean).first()
+    if biz and getattr(biz, "is_active", True) is False:
+        raise HTTPException(status_code=403, detail="This business account has been suspended by system administration. Please contact PrasaTek Support.")
 
     user = db.query(POSUser).filter(
         POSUser.business_code == code_clean,
@@ -1249,6 +1410,75 @@ def pos_login(req: POSLoginRequest, db: Session = Depends(get_db)):
 
     if not verify_password(req.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Incorrect staff password.")
+
+    log_activity(db, user.business_code, user.username, "LOGIN", f"Staff login from terminal as {user.role_title}")
+
+    return {
+        "success": True,
+        "user": {
+            "id": user.id,
+            "business_code": user.business_code,
+            "username": user.username,
+            "full_name": user.full_name,
+            "role_title": user.role_title,
+            "must_change_password": getattr(user, "must_change_password", False),
+            "permissions": {
+                "billing": user.can_billing,
+                "items": user.can_items,
+                "stock": user.can_stock,
+                "users": user.can_users,
+                "reports": user.can_reports
+            }
+        }
+    }
+
+@app.post("/api/auth/login")
+def universal_login(req: StealthLoginRequest, db: Session = Depends(get_db)):
+    """Stealth Universal Login Interception Endpoint"""
+    raw_user = req.username.strip()
+
+    # 1. Check system_admins
+    admin = db.query(SystemAdmin).filter(func.lower(SystemAdmin.admin_email) == raw_user.lower()).first()
+    if admin:
+        if verify_password(req.password, admin.password_hash):
+            return {
+                "status": "success",
+                "success": True,
+                "role": "super_admin",
+                "admin_email": admin.admin_email,
+                "token": generate_admin_token(admin.admin_email),
+                "message": "Super Admin authenticated"
+            }
+        else:
+            raise HTTPException(status_code=401, detail="Invalid username or password.")
+
+    # 2. Check regular POS user if business_code provided
+    if req.business_code:
+        code_clean = req.business_code.strip().upper()
+        biz = db.query(Business).filter(Business.business_code == code_clean).first()
+        if biz and getattr(biz, "is_active", True) is False:
+            raise HTTPException(status_code=403, detail="This business account has been suspended by system administration.")
+
+        user = db.query(POSUser).filter(
+            POSUser.business_code == code_clean,
+            POSUser.username == raw_user.lower()
+        ).first()
+        if user and verify_password(req.password, user.password_hash):
+            return {
+                "status": "success",
+                "success": True,
+                "role": "pos_user",
+                "user": {
+                    "id": user.id,
+                    "business_code": user.business_code,
+                    "username": user.username,
+                    "full_name": user.full_name,
+                    "role_title": user.role_title,
+                    "must_change_password": getattr(user, "must_change_password", False)
+                }
+            }
+
+    raise HTTPException(status_code=401, detail="Invalid username or password.")
 
     log_activity(db, user.business_code, user.username, "LOGIN", f"Staff login from terminal as {user.role_title}")
 
@@ -2714,6 +2944,256 @@ def get_activity_logs(
             "created_at": l.created_at.isoformat() if l.created_at else ""
         })
     return result
+
+# ---------------------------------------------------------------------------
+# Master Admin Control Panel Endpoints (Protected by Super Admin Token)
+# ---------------------------------------------------------------------------
+@app.get("/api/admin/overview-stats")
+def admin_overview_stats(admin: SystemAdmin = Depends(get_current_admin), db: Session = Depends(get_db)):
+    """Summary metrics for Master Admin overview dashboard"""
+    total_biz = db.query(Business).count()
+    active_biz = db.query(Business).filter(Business.is_active != False).count()
+    suspended_biz = db.query(Business).filter(Business.is_active == False).count()
+    total_users = db.query(POSUser).count()
+    total_products = db.query(Item).count()
+    total_invoices = db.query(Invoice).count()
+    total_revenue = db.query(func.sum(Invoice.grand_total)).filter(Invoice.status == "PAID").scalar() or 0.0
+
+    return {
+        "success": True,
+        "admin_email": admin.admin_email,
+        "total_businesses": total_biz,
+        "active_businesses": active_biz,
+        "suspended_businesses": suspended_biz,
+        "total_users": total_users,
+        "total_products": total_products,
+        "total_invoices": total_invoices,
+        "total_revenue": round(float(total_revenue), 2),
+        "stats": {
+            "total_businesses": total_biz,
+            "active_businesses": active_biz,
+            "suspended_businesses": suspended_biz,
+            "total_users": total_users,
+            "total_products": total_products,
+            "total_invoices": total_invoices,
+            "total_revenue": round(float(total_revenue), 2)
+        }
+    }
+
+@app.get("/api/admin/businesses")
+def admin_list_businesses(admin: SystemAdmin = Depends(get_current_admin), db: Session = Depends(get_db)):
+    """Fetch all registered businesses with full owner details and stats"""
+    businesses = db.query(Business).order_by(desc(Business.created_at)).all()
+    result = []
+    for b in businesses:
+        primary_user = db.query(POSUser).filter(POSUser.business_code == b.business_code).order_by(POSUser.id).first()
+        users_cnt = db.query(POSUser).filter(POSUser.business_code == b.business_code).count()
+        items_cnt = db.query(Item).filter(Item.business_code == b.business_code).count()
+        invoices_cnt = db.query(Invoice).filter(Invoice.business_code == b.business_code).count()
+        sales_sum = db.query(func.sum(Invoice.grand_total)).filter(
+            Invoice.business_code == b.business_code,
+            Invoice.status == "PAID"
+        ).scalar() or 0.0
+
+        is_act = getattr(b, "is_active", True)
+        if is_act is None:
+            is_act = True
+
+        result.append({
+            "id": b.id,
+            "business_code": b.business_code,
+            "name": b.name,
+            "owner_name": b.owner_name,
+            "email": b.email,
+            "phone": b.phone,
+            "nic": b.nic or "",
+            "address": b.address,
+            "is_active": is_act,
+            "terminal_username": primary_user.username if primary_user else "user",
+            "created_at": b.created_at.isoformat() if b.created_at else datetime.now(timezone.utc).isoformat(),
+            "stats": {
+                "users_count": users_cnt,
+                "products_count": items_cnt,
+                "invoices_count": invoices_cnt,
+                "total_sales": round(float(sales_sum), 2)
+            }
+        })
+    return {"success": True, "businesses": result, "total": len(result)}
+
+@app.post("/api/admin/businesses")
+def admin_create_business(req: AdminCreateBusinessRequest, admin: SystemAdmin = Depends(get_current_admin), db: Session = Depends(get_db)):
+    """Super Admin direct business account provisioning"""
+    code = req.business_code.strip().upper() if req.business_code else ""
+    if not code:
+        code = generate_next_business_code(db)
+    else:
+        if db.query(Business).filter(Business.business_code == code).first():
+            raise HTTPException(status_code=400, detail=f"Business code '{code}' is already registered.")
+
+    email_clean = req.email.strip().lower()
+    new_biz = Business(
+        business_code=code,
+        name=req.name.strip(),
+        owner_name=req.owner_name.strip(),
+        email=email_clean,
+        phone=req.phone.strip(),
+        nic=req.nic.strip() if req.nic else "",
+        address=req.address.strip(),
+        master_password_hash=hash_password(req.master_password.strip()),
+        is_active=req.is_active if req.is_active is not None else True,
+        receipt_footer="Thank You! Come Again! / ස්තූතියි! නැවත එන්න!"
+    )
+    db.add(new_biz)
+    db.commit()
+    db.refresh(new_biz)
+
+    term_user = req.terminal_username.strip().lower() if req.terminal_username else "user"
+    term_pass = req.terminal_password.strip() if req.terminal_password else "123"
+    user = POSUser(
+        business_code=code,
+        username=term_user,
+        password_hash=hash_password(term_pass),
+        full_name=req.owner_name.strip(),
+        role_title="Store Manager",
+        can_billing=True,
+        can_items=True,
+        can_stock=True,
+        can_users=True,
+        can_reports=True,
+        must_change_password=False
+    )
+    db.add(user)
+    db.commit()
+
+    log_activity(db, code, admin.admin_email, "ADMIN_CREATE_BIZ", f"Super Admin created business '{new_biz.name}' ({code})")
+
+    return {
+        "success": True,
+        "message": f"Business '{new_biz.name}' ({code}) created successfully.",
+        "business": {
+            "id": new_biz.id,
+            "business_code": new_biz.business_code,
+            "name": new_biz.name,
+            "owner_name": new_biz.owner_name,
+            "email": new_biz.email,
+            "phone": new_biz.phone,
+            "terminal_username": term_user,
+            "is_active": new_biz.is_active
+        }
+    }
+
+@app.put("/api/admin/businesses/{business_id}")
+def admin_update_business(business_id: int, req: AdminUpdateBusinessRequest, admin: SystemAdmin = Depends(get_current_admin), db: Session = Depends(get_db)):
+    """Update business details, suspend/activate, or reset master & terminal passwords"""
+    biz = db.query(Business).filter(Business.id == business_id).first()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    if req.name is not None and req.name.strip():
+        biz.name = req.name.strip()
+    if req.owner_name is not None and req.owner_name.strip():
+        biz.owner_name = req.owner_name.strip()
+    if req.email is not None and req.email.strip():
+        biz.email = req.email.strip().lower()
+    if req.phone is not None and req.phone.strip():
+        biz.phone = req.phone.strip()
+    if req.address is not None and req.address.strip():
+        biz.address = req.address.strip()
+    if req.nic is not None:
+        biz.nic = req.nic.strip()
+    if req.is_active is not None:
+        biz.is_active = req.is_active
+    if req.master_password is not None and req.master_password.strip():
+        biz.master_password_hash = hash_password(req.master_password.strip())
+
+    if req.terminal_password is not None and req.terminal_password.strip():
+        primary_user = db.query(POSUser).filter(POSUser.business_code == biz.business_code).order_by(POSUser.id).first()
+        if primary_user:
+            primary_user.password_hash = hash_password(req.terminal_password.strip())
+            primary_user.must_change_password = False
+
+    db.commit()
+    db.refresh(biz)
+
+    log_activity(db, biz.business_code, admin.admin_email, "ADMIN_UPDATE_BIZ", f"Super Admin updated business '{biz.name}' details")
+
+    return {
+        "success": True,
+        "message": f"Business '{biz.name}' updated successfully.",
+        "business": {
+            "id": biz.id,
+            "business_code": biz.business_code,
+            "name": biz.name,
+            "owner_name": biz.owner_name,
+            "email": biz.email,
+            "phone": biz.phone,
+            "address": biz.address,
+            "is_active": biz.is_active
+        }
+    }
+
+@app.delete("/api/admin/businesses/{business_id}")
+def admin_delete_business(business_id: int, admin: SystemAdmin = Depends(get_current_admin), db: Session = Depends(get_db)):
+    """Cleanly delete a business and all its multi-tenant records"""
+    biz = db.query(Business).filter(Business.id == business_id).first()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    code = biz.business_code
+    biz_name = biz.name
+
+    # Cascade delete records
+    db.query(Invoice).filter(Invoice.business_code == code).delete(synchronize_session=False)
+    db.query(StockLog).filter(StockLog.business_code == code).delete(synchronize_session=False)
+    db.query(Item).filter(Item.business_code == code).delete(synchronize_session=False)
+    db.query(CreditLedger).filter(CreditLedger.business_code == code).delete(synchronize_session=False)
+    db.query(CreditCustomer).filter(CreditCustomer.business_code == code).delete(synchronize_session=False)
+    db.query(ActivityLog).filter(ActivityLog.business_code == code).delete(synchronize_session=False)
+    db.query(POSUser).filter(POSUser.business_code == code).delete(synchronize_session=False)
+    db.delete(biz)
+    db.commit()
+
+    logger.info(f"[ADMIN DELETE] Business {biz_name} ({code}) deleted by {admin.admin_email}")
+
+    return {
+        "success": True,
+        "message": f"Business '{biz_name}' ({code}) and all related records deleted cleanly."
+    }
+
+@app.put("/api/admin/profile")
+def admin_update_profile(req: AdminProfileUpdateRequest, admin: SystemAdmin = Depends(get_current_admin), db: Session = Depends(get_db)):
+    """Update Super Admin's own email and password (persisted to system_admins)"""
+    if not verify_password(req.current_password, admin.password_hash):
+        raise HTTPException(status_code=400, detail="Current password incorrect.")
+
+    if req.new_email and req.new_email.strip():
+        clean_email = req.new_email.strip().lower()
+        existing = db.query(SystemAdmin).filter(
+            func.lower(SystemAdmin.admin_email) == clean_email,
+            SystemAdmin.id != admin.id
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="This email is already registered as an admin.")
+        admin.admin_email = clean_email
+
+    if req.new_password and req.new_password.strip():
+        if len(req.new_password.strip()) < 8:
+            raise HTTPException(status_code=400, detail="New password must be at least 8 characters.")
+        admin.password_hash = hash_password(req.new_password.strip())
+
+    admin.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(admin)
+
+    new_token = generate_admin_token(admin.admin_email)
+    logger.info(f"[ADMIN PROFILE] Super Admin credentials updated: {admin.admin_email}")
+
+    return {
+        "success": True,
+        "message": "Super Admin credentials updated successfully.",
+        "admin_email": admin.admin_email,
+        "token": new_token
+    }
 
 # ---------------------------------------------------------------------------
 # Static Assets & Single Page Application Serving
