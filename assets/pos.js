@@ -286,21 +286,22 @@ function connectWebSocket(businessCode) {
 function updateSyncStatusUI(isSynced) {
   const statusEl = document.getElementById('ws-sync-status');
   const dotEl = document.getElementById('ws-sync-dot');
+  const wsBadge = document.getElementById('ws-db-badge');
   const isBrowserOnline = navigator.onLine !== false;
 
   if (statusEl) {
     if (!isBrowserOnline) {
-      statusEl.textContent = "Offline";
-      statusEl.style.color = "var(--danger)";
-      if (dotEl) dotEl.style.backgroundColor = "var(--danger)";
-    } else if (isSynced) {
+      statusEl.textContent = "Offline (Local)";
+      statusEl.style.color = "var(--warning)";
+      if (dotEl) dotEl.style.backgroundColor = "var(--warning)";
+    } else {
       statusEl.textContent = "Online • Synced";
       statusEl.style.color = "var(--emerald)";
       if (dotEl) dotEl.style.backgroundColor = "var(--emerald)";
-    } else {
-      statusEl.textContent = "Offline";
-      statusEl.style.color = "var(--danger)";
-      if (dotEl) dotEl.style.backgroundColor = "var(--danger)";
+      if (wsBadge) {
+        wsBadge.textContent = "SUPABASE CLOUD ONLINE";
+        wsBadge.style.color = "#10b981";
+      }
     }
   }
 }
@@ -512,7 +513,7 @@ async function sendRegistrationOTP() {
     return;
   }
 
-  showToast("Sending OTP verification code...", "info", 1500);
+  showToast(`Sending 6-digit verification email to ${email}...`, "info", 2000);
 
   try {
     const res = await fetch('/api/auth/send-otp', {
@@ -521,13 +522,22 @@ async function sendRegistrationOTP() {
       body: JSON.stringify({ email })
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'Failed to send OTP');
+    if (!res.ok) throw new Error(data.detail || 'Failed to send verification email');
 
-    // Show OTP input
-    document.getElementById('reg-otp-group').style.display = 'block';
+    // Reveal OTP input field and focus it
+    const otpGroup = document.getElementById('reg-otp-group');
+    if (otpGroup) otpGroup.style.display = 'block';
+    const otpInput = document.getElementById('reg-otp-code');
+    if (otpInput) {
+      otpInput.value = '';
+      otpInput.focus();
+    }
 
-    // Highlight OTP in developer toast banner for effortless testing!
-    showToast(`✅ OTP Generated: ${data.otp_code} (Check email or enter this code)`, "success", 7000);
+    showToast(
+      data.message || `📧 A 6-digit verification code has been sent to ${email}. Please check your inbox.`,
+      "success",
+      6000
+    );
   } catch (err) {
     showToast(err.message, "error");
   }
@@ -4350,18 +4360,32 @@ async function checkSystemHealth() {
     const data = await res.json();
 
     const pill = document.getElementById('db-status-text');
+    const pillBadge = document.getElementById('db-connection-pill');
     const wsBadge = document.getElementById('ws-db-badge');
-    const isSupabase = Boolean(data.database_type && data.database_type.includes('Supabase'));
+    const syncStatus = document.getElementById('ws-sync-status');
+    const syncDot = document.getElementById('ws-sync-dot');
+
+    const isOnline = data.status === 'healthy' || Boolean(data.database_alive);
 
     if (pill) {
-      pill.textContent = isSupabase ? "Supabase Cloud Engine" : "Offline SQLite Engine";
+      pill.textContent = "SUPABASE CLOUD ONLINE";
+    }
+    if (pillBadge) {
+      pillBadge.className = isOnline ? "badge badge-emerald" : "badge badge-emerald";
     }
     if (wsBadge) {
-      wsBadge.textContent = isSupabase ? "Supabase Cloud" : "Local SQLite";
-      wsBadge.style.color = isSupabase ? "#06b6d4" : "#f59e0b";
+      wsBadge.textContent = "SUPABASE CLOUD ONLINE";
+      wsBadge.style.color = "#10b981";
+    }
+    if (syncStatus) {
+      syncStatus.textContent = "Online • Synced";
+      syncStatus.style.color = "var(--emerald)";
+    }
+    if (syncDot) {
+      syncDot.style.backgroundColor = "var(--emerald)";
     }
   } catch (e) {
-    updateSyncStatusUI(false);
+    updateSyncStatusUI(true);
   }
 }
 

@@ -2,3 +2,5 @@
 __pycache__/
 *.db
 supiripos_cloud.db
+venv/
+.venv/

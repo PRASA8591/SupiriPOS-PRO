@@ -20,9 +20,10 @@ from typing import List, Dict, Optional, Any
 
 from fastapi import (
     FastAPI, WebSocket, WebSocketDisconnect, HTTPException,
-    Depends, Request, Response, status, Query
+    Depends, Request, Response, Query
 )
 from fastapi.middleware.cors import CORSMiddleware
+# pyrefly: ignore[missing-import]
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
@@ -43,193 +44,134 @@ logging.basicConfig(
 )
 logger = logging.getLogger("SupiriPOS")
 
-# Load environment variables
-load_dotenv()
+# Load environment variables (override=True forces fresh values from .env)
+ENV_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+load_dotenv(dotenv_path=ENV_FILE_PATH, override=True)
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "8000"))
 SECRET_KEY = os.getenv("SECRET_KEY", "supiripos-prasatek-secret-key-2026")
-SMTP_HOST = os.getenv("SMTP_HOST", "smtp-relay.brevo.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_LOGIN = os.getenv("SMTP_LOGIN", os.getenv("SMTP_EMAIL", ""))
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
-SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", "info@prasatek.lk")
-SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "PrasaTek System Solutions")
+SMTP_HOST = os.getenv("SMTP_HOST", "smtppro.zoho.com").strip()
+SMTP_PORT = int(os.getenv("SMTP_PORT", "465").strip())
+SMTP_LOGIN = os.getenv("SMTP_LOGIN", os.getenv("SMTP_EMAIL", "info@prasatek.lk")).strip()
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "").strip()
+SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", "info@prasatek.lk").strip()
+SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "PrasaTek System Solutions").strip()
 SMTP_EMAIL = SMTP_FROM_EMAIL
 
-def send_smtp_email(to_email: str, subject: str, html_content: str) -> bool:
+def send_smtp_email_detailed(to_email: str, subject: str, html_content: str, plain_text: str = ""):
     """
-    Sends an HTML email via Brevo SMTP relay from PrasaTek System Solutions <info@prasatek.lk>.
+    Sends a real HTML email via Zoho Mail SMTP relay from PrasaTek System Solutions <info@prasatek.lk>.
+    1. Reloads .env with override=True on EVERY call so credential updates take effect immediately.
+    2. Automatically cascades across Zoho hosts and ports:
+       - Configured port (e.g. 465 SSL or 587 STARTTLS) on configured host (e.g. smtppro.zoho.com)
+       - If smtppro.zoho.com returns 554 Access Restricted (non-pro tier), seamlessly falls back to smtp.zoho.com
+       - Fallback to alternative port (465 SSL <-> 587 STARTTLS)
+    3. Returns (success: bool, error_detail: str).
     """
-    if not SMTP_LOGIN or not SMTP_PASSWORD:
-        return False
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = f"{SMTP_FROM_NAME} <{SMTP_FROM_EMAIL}>"
-        msg["To"] = to_email
-        msg.attach(MIMEText(html_content, "html", "utf-8"))
+    load_dotenv(dotenv_path=ENV_FILE_PATH, override=True)
 
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=8) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-            server.login(SMTP_LOGIN, SMTP_PASSWORD)
-            server.sendmail(SMTP_FROM_EMAIL, [to_email], msg.as_string())
-        logger.info(f"[SMTP] Email sent to {to_email} via {SMTP_HOST}:{SMTP_PORT}")
-        return True
-    except Exception as e:
-        logger.warning(f"[SMTP WARNING] Could not send email to {to_email}: {e}")
-        return False
+    smtp_host = os.getenv("SMTP_HOST", "smtppro.zoho.com").strip()
+    smtp_port = int(os.getenv("SMTP_PORT", "465").strip())
+    smtp_login = os.getenv("SMTP_LOGIN", os.getenv("SMTP_EMAIL", "info@prasatek.lk")).strip()
+    smtp_password = os.getenv("SMTP_PASSWORD", "").strip()
+    smtp_from_email = os.getenv("SMTP_FROM_EMAIL", "info@prasatek.lk").strip()
+    smtp_from_name = os.getenv("SMTP_FROM_NAME", "PrasaTek System Solutions").strip()
+
+    if not smtp_login or not smtp_password:
+        err_msg = "Missing SMTP_LOGIN or SMTP_PASSWORD in .env"
+        logger.error(f"[SMTP ERROR] {err_msg}")
+        return False, err_msg
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = f"{smtp_from_name} <{smtp_from_email}>"
+    msg["To"] = to_email
+    msg["Reply-To"] = smtp_from_email
+
+    if plain_text:
+        msg.attach(MIMEText(plain_text, "plain", "utf-8"))
+    msg.attach(MIMEText(html_content, "html", "utf-8"))
+    raw_message = msg.as_string()
+
+    # Build server attempts: primary host + port first, then alternative port, then alternative Zoho host
+    hosts = [smtp_host]
+    if "zoho" in smtp_host.lower():
+        alt_host = "smtp.zoho.com" if "smtppro" in smtp_host.lower() else "smtppro.zoho.com"
+        if alt_host not in hosts:
+            hosts.append(alt_host)
+
+    if smtp_port == 465:
+        ports = [(465, "SMTP_SSL"), (587, "STARTTLS")]
+    elif smtp_port == 587:
+        ports = [(587, "STARTTLS"), (465, "SMTP_SSL")]
+    else:
+        ports = [(smtp_port, "SMTP_SSL" if smtp_port == 465 else "STARTTLS"), (465, "SMTP_SSL"), (587, "STARTTLS")]
+
+    server_attempts = []
+    for h in hosts:
+        for p, m in ports:
+            if (h, p, m) not in server_attempts:
+                server_attempts.append((h, p, m))
+
+    attempt_errors = []
+
+    for idx, (host, port, mode) in enumerate(server_attempts, start=1):
+        try:
+            logger.info(
+                f"[SMTP] Attempt {idx}/{len(server_attempts)}: Connecting to {host}:{port} ({mode}) as '{smtp_login}' -> '{to_email}'"
+            )
+            if mode == "SMTP_SSL":
+                context = ssl.create_default_context()
+                with smtplib.SMTP_SSL(host, port, timeout=10, context=context) as server:
+                    server.ehlo()
+                    server.login(smtp_login, smtp_password)
+                    server.sendmail(smtp_from_email, [to_email], raw_message)
+            else:
+                context = ssl.create_default_context()
+                with smtplib.SMTP(host, port, timeout=10) as server:
+                    server.ehlo()
+                    server.starttls(context=context)
+                    server.ehlo()
+                    server.login(smtp_login, smtp_password)
+                    server.sendmail(smtp_from_email, [to_email], raw_message)
+
+            logger.info(
+                f"[SMTP SUCCESS] Email delivered to {to_email} from '{smtp_from_name} <{smtp_from_email}>' "
+                f"via {host}:{port} ({mode}) on Attempt {idx}!"
+            )
+            return True, ""
+
+        except smtplib.SMTPAuthenticationError as auth_err:
+            err_code = getattr(auth_err, "smtp_code", 535)
+            err_raw = getattr(auth_err, "smtp_error", b"")
+            err_text = err_raw.decode("utf-8", errors="replace") if isinstance(err_raw, bytes) else str(err_raw)
+            detail = f"{host}:{port} ({mode}) Auth Error ({err_code}): {err_text}"
+            logger.error(f"[SMTP ERROR] Attempt {idx}/{len(server_attempts)} failed for {to_email} — {detail}")
+            attempt_errors.append(detail)
+        except Exception as e:
+            detail = f"{host}:{port} ({mode}): {type(e).__name__}: {e}"
+            logger.error(f"[SMTP ERROR] Attempt {idx}/{len(server_attempts)} failed for {to_email} — {detail}")
+            attempt_errors.append(detail)
+
+    combined_error = " | ".join(attempt_errors)
+    logger.error(f"[SMTP ERROR] All {len(server_attempts)} server attempts failed sending to {to_email}: {combined_error}")
+    return False, combined_error
+
+
+def send_smtp_email(to_email: str, subject: str, html_content: str, plain_text: str = "") -> bool:
+    """Wrapper returning bool for callers that only check True/False."""
+    ok, _ = send_smtp_email_detailed(to_email, subject, html_content, plain_text)
+    return ok
 
 # ---------------------------------------------------------------------------
-# Dual-Database Connection & Resilience Fallback
+# Supabase Cloud Database Engine (via database.py)
 # ---------------------------------------------------------------------------
-Base = declarative_base()
-ACTIVE_DB_TYPE = "Unknown"
-DB_STATUS_NOTE = ""
-
-def format_database_url(raw_url: str, driver: str = "psycopg2") -> str:
-    """
-    Format PostgreSQL URL with specified driver and safely URL-encode any special
-    characters in the user/password (such as @, #, $, %, etc.).
-    """
-    if not raw_url or "://" not in raw_url:
-        return raw_url
-
-    scheme_part, rest = raw_url.split("://", 1)
-    target_scheme = f"postgresql+{driver}" if driver else "postgresql"
-
-    # Separate query parameters if present
-    query_str = ""
-    if "?" in rest:
-        rest, query_str = rest.split("?", 1)
-
-    if "@" in rest:
-        auth_part, host_part = rest.rsplit("@", 1)
-        if ":" in auth_part:
-            user, pwd = auth_part.split(":", 1)
-            safe_user = urllib.parse.quote(urllib.parse.unquote(user), safe="")
-            safe_pwd = urllib.parse.quote(urllib.parse.unquote(pwd), safe="")
-            auth_str = f"{safe_user}:{safe_pwd}"
-        else:
-            safe_user = urllib.parse.quote(urllib.parse.unquote(auth_part), safe="")
-            auth_str = safe_user
-        formatted = f"{target_scheme}://{auth_str}@{host_part}"
-    else:
-        formatted = f"{target_scheme}://{rest}"
-
-    if query_str:
-        q_params = urllib.parse.parse_qs(query_str)
-        if driver == "pg8000":
-            q_params.pop("sslmode", None)
-        if q_params:
-            formatted += f"?{urllib.parse.urlencode(q_params, doseq=True)}"
-
-    return formatted
-
-def init_database_engine():
-    """
-    Attempts to connect to Supabase Cloud PostgreSQL with multi-driver cascade:
-    1. If psycopg2 is installed/working, uses postgresql+psycopg2://...
-    2. If psycopg2 fails (e.g. Windows Python 3.12+), automatically tries
-       postgresql+psycopg://... or postgresql+pg8000://... (with SSL enabled for Supabase).
-    3. Safely URL-encodes special characters in the password.
-    4. Only falls back to local SQLite if all cloud PostgreSQL drivers fail.
-    """
-    global ACTIVE_DB_TYPE, DB_STATUS_NOTE
-    
-    use_sqlite_fallback = False
-    
-    # Check if URL contains placeholder or is missing
-    if not DATABASE_URL or "[YOUR-PASSWORD]" in DATABASE_URL or "postgres:[YOUR-PASSWORD]" in DATABASE_URL:
-        logger.warning(
-            "[DB WARNING] DATABASE_URL contains placeholder '[YOUR-PASSWORD]' or is unconfigured. "
-            "Activating offline resilience fallback to local SQLite."
-        )
-        use_sqlite_fallback = True
-        DB_STATUS_NOTE = "Offline Fallback: Replace [YOUR-PASSWORD] in .env for Supabase Cloud sync"
-    else:
-        # Multi-driver waterfall: psycopg2 -> psycopg (v3) -> pg8000 (pure-python)
-        driver_cascade = ["psycopg2", "psycopg", "pg8000"]
-        last_error = None
-
-        for driver in driver_cascade:
-            try:
-                # Check if driver is importable
-                if driver == "psycopg2":
-                    import psycopg2
-                elif driver == "psycopg":
-                    import psycopg
-                elif driver == "pg8000":
-                    import pg8000
-            except ImportError as ie:
-                logger.info(f"[DB] PostgreSQL driver '{driver}' is not installed ({ie}). Skipping.")
-                continue
-
-            try:
-                formatted_url = format_database_url(DATABASE_URL, driver=driver)
-                host_display = formatted_url.split("@")[-1].split("?")[0]
-                logger.info(f"[DB] Attempting connection to Supabase PostgreSQL using driver '{driver}' on {host_display}")
-
-                connect_args = {"connect_timeout": 5}
-                if driver in ("psycopg2", "psycopg"):
-                    connect_args["sslmode"] = "require"
-                elif driver == "pg8000":
-                    # pg8000 uses ssl_context and timeout argument
-                    ctx = ssl.create_default_context()
-                    ctx.check_hostname = False
-                    ctx.verify_mode = ssl.CERT_NONE
-                    connect_args = {"ssl_context": ctx, "timeout": 5}
-
-                pg_engine = create_engine(
-                    formatted_url,
-                    pool_pre_ping=True,
-                    pool_recycle=300,
-                    connect_args=connect_args
-                )
-
-                # Test connection
-                with pg_engine.connect() as conn:
-                    conn.execute(text("SELECT 1"))
-
-                logger.info(f"[DB SUCCESS] Connected to Supabase Cloud PostgreSQL via {driver}!")
-                ACTIVE_DB_TYPE = f"Supabase PostgreSQL ({driver})"
-                DB_STATUS_NOTE = f"Connected to Supabase Cloud Database via {driver}"
-                return pg_engine
-
-            except Exception as e:
-                last_error = e
-                logger.warning(f"[DB WARNING] Supabase connection failed with driver '{driver}': {e}")
-
-        # If all cloud drivers fail, activate SQLite offline fallback
-        logger.warning(
-            f"[DB WARNING] All PostgreSQL drivers failed. Last error: {last_error}. "
-            "Falling back to local SQLite (sqlite:///./supiripos_cloud.db) so system never crashes."
-        )
-        use_sqlite_fallback = True
-        DB_STATUS_NOTE = f"Offline SQLite Fallback (Cloud error: {str(last_error)[:60]}...)"
-
-    if use_sqlite_fallback:
-        sqlite_url = "sqlite:///./supiripos_cloud.db"
-        ACTIVE_DB_TYPE = "Local SQLite (Offline Resilience)"
-        sqlite_engine = create_engine(
-            sqlite_url,
-            connect_args={"check_same_thread": False}
-        )
-        logger.info("[DB] SQLite database engine initialized successfully.")
-        return sqlite_engine
-
-engine = init_database_engine()
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+from database import (
+    Base, engine, SessionLocal, get_db,
+    ACTIVE_DB_TYPE, DB_STATUS_NOTE, format_database_url
+)
 
 # ---------------------------------------------------------------------------
 # Database Models (Strict Multi-Tenant Isolation by business_code)
@@ -685,8 +627,11 @@ def seed_demo_supermarket(db: Session):
         logger.warning(f"[SEED CREDIT] {seed_cr_err}")
 
 # Initialize Demo Shop in DB
-with SessionLocal() as db_session:
-    seed_demo_supermarket(db_session)
+try:
+    with SessionLocal() as db_session:
+        seed_demo_supermarket(db_session)
+except Exception as seed_err:
+    logger.warning(f"[SEED WARNING] Seed check: {seed_err}")
 
 # ---------------------------------------------------------------------------
 # FastAPI App Initialization
@@ -862,6 +807,7 @@ def health(db: Session = Depends(get_db)):
         "app": "SupiriPOS PRO",
         "provider": "PrasaTek System Solutions",
         "database_type": ACTIVE_DB_TYPE,
+        "database_mode": "SUPABASE CLOUD ONLINE",
         "database_alive": db_alive,
         "note": DB_STATUS_NOTE,
         "time": datetime.now(timezone.utc).isoformat()
@@ -980,6 +926,7 @@ def get_sync_state(business_code: str, db: Session = Depends(get_db)):
 # ---------------------------------------------------------------------------
 @app.post("/api/auth/send-otp")
 def send_otp(req: SendOTPRequest, db: Session = Depends(get_db)):
+    load_dotenv(dotenv_path=ENV_FILE_PATH, override=True)
     email_clean = req.email.strip().lower()
     if not email_clean or "@" not in email_clean:
         raise HTTPException(status_code=400, detail="Invalid email address.")
@@ -997,30 +944,86 @@ def send_otp(req: SendOTPRequest, db: Session = Depends(get_db)):
     db.add(otp_record)
     db.commit()
 
-    # Try sending real email via Brevo SMTP
+    smtp_from_name = os.getenv("SMTP_FROM_NAME", "PrasaTek System Solutions").strip()
+
     html_content = f"""
-    <div style="font-family: Arial, sans-serif; background-color: #0b1120; color: #f8fafc; padding: 30px; border-radius: 12px; max-width: 520px; margin: auto;">
-        <h2 style="color: #10b981; margin-bottom: 5px;">SupiriPOS PRO</h2>
-        <p style="color: #94a3b8; font-size: 14px; margin-top: 0;">Powered by {SMTP_FROM_NAME}</p>
-        <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.3); text-align: center; margin: 20px 0;">
-            <p style="margin: 0; font-size: 14px; color: #94a3b8;">Your 6-Digit Business Verification Code:</p>
-            <h1 style="font-size: 38px; letter-spacing: 6px; color: #10b981; margin: 10px 0;">{otp}</h1>
-            <p style="margin: 0; font-size: 12px; color: #64748b;">This OTP code expires in 10 minutes.</p>
-        </div>
-        <p style="font-size: 13px; color: #64748b; line-height: 1.5;">If you didn't request this verification code, please ignore this email.</p>
-    </div>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>SupiriPOS PRO Verification Code</title>
+    </head>
+    <body style="margin: 0; padding: 30px 15px; background-color: #0b1120; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #f8fafc;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 540px; margin: 0 auto; background-color: #0f172a; border-radius: 16px; border: 1px solid #1e293b; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);">
+            <tr>
+                <td style="padding: 32px 28px 24px 28px; text-align: left;">
+                    <div style="margin-bottom: 4px;">
+                        <span style="font-size: 24px; font-weight: 800; color: #10b981; letter-spacing: -0.5px;">SupiriPOS <span style="color: #38bdf8;">PRO</span></span>
+                    </div>
+                    <p style="margin: 0 0 16px 0; font-size: 13px; color: #94a3b8; font-weight: 500;">Next-Gen Cloud Point of Sale System</p>
+                    <div style="height: 1px; width: 100%; background: linear-gradient(90deg, #10b981 0%, rgba(16, 185, 129, 0.1) 100%); margin-bottom: 24px;"></div>
+                    
+                    <h2 style="margin: 0 0 10px 0; font-size: 20px; font-weight: 700; color: #f8fafc;">Verify Your Business Email</h2>
+                    <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #cbd5e1;">
+                        Thank you for choosing SupiriPOS PRO. Please use the 6-digit verification code below to verify your email and complete your store registration.
+                    </p>
+
+                    <div style="background: #1e293b; border: 1.5px dashed #10b981; border-radius: 12px; padding: 22px 16px; text-align: center; margin: 24px 0;">
+                        <span style="font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #10b981; display: block; margin-bottom: 6px;">Single-Use Verification Code</span>
+                        <div style="font-size: 40px; font-weight: 800; letter-spacing: 8px; color: #ffffff; font-family: 'Courier New', Courier, monospace; margin: 4px 0; text-shadow: 0 2px 10px rgba(16, 185, 129, 0.3);">{otp}</div>
+                        <p style="margin: 6px 0 0 0; font-size: 12px; color: #94a3b8;">⏱ Code expires in <strong style="color: #f1f5f9;">10 minutes</strong>. Never share this code.</p>
+                    </div>
+
+                    <p style="font-size: 13px; color: #64748b; line-height: 1.5; margin: 0 0 24px 0;">
+                        If you did not request this verification code, please ignore this email or contact our support team.
+                    </p>
+
+                    <div style="border-top: 1px solid #1e293b; padding-top: 20px; text-align: center;">
+                        <p style="margin: 0 0 6px 0; font-size: 13px; font-weight: 700; color: #f1f5f9;">PrasaTek System Solutions</p>
+                        <p style="margin: 0 0 6px 0; font-size: 12px; color: #94a3b8;">
+                            <a href="https://www.prasatek.lk" style="color: #10b981; text-decoration: none; font-weight: 600;">www.prasatek.lk</a>
+                            &nbsp;&bull;&nbsp;
+                            <a href="mailto:info@prasatek.lk" style="color: #38bdf8; text-decoration: none;">info@prasatek.lk</a>
+                        </p>
+                        <p style="margin: 0; font-size: 11px; color: #64748b; font-style: italic;">Smart POS &amp; Enterprise Software Solutions — Sri Lanka</p>
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
     """
-    email_sent = send_smtp_email(
+    plain_text = (
+        f"SupiriPOS PRO — Next-Gen Cloud POS\n\n"
+        f"Your 6-Digit Business Verification Code: {otp}\n"
+        f"This code will expire in 10 minutes.\n\n"
+        f"If you did not request this code, please ignore this email.\n\n"
+        f"----------------------------------------\n"
+        f"PrasaTek System Solutions\n"
+        f"Website: https://www.prasatek.lk\n"
+        f"Support: info@prasatek.lk\n"
+        f"Smart POS & Enterprise Software Solutions — Sri Lanka\n"
+    )
+
+    email_sent, error_reason = send_smtp_email_detailed(
         to_email=email_clean,
         subject=f"Your SupiriPOS PRO Verification Code: {otp}",
-        html_content=html_content
+        html_content=html_content,
+        plain_text=plain_text
     )
+
+    if not email_sent:
+        logger.error(f"[OTP SMTP ERROR] Failed sending OTP to {email_clean}: {error_reason}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to send verification email to {email_clean}. Technical reason: {error_reason}"
+        )
 
     return {
         "success": True,
-        "otp_code": otp,  # Included so developer/tester sees OTP in toast notification immediately
-        "email_sent": email_sent,
-        "message": f"Verification code sent to {email_clean}. (Code: {otp})"
+        "email_sent": True,
+        "message": f"A 6-digit verification code has been sent to {email_clean}. Please check your email inbox."
     }
 
 @app.post("/api/auth/verify-otp")
@@ -1095,29 +1098,115 @@ def register_business(req: RegisterBusinessRequest, db: Session = Depends(get_db
 
     log_activity(db, business_code, "System", "BUSINESS_REGISTERED", f"Business '{new_biz.name}' registered with initial admin account.")
 
-    # Send official Welcome Email via Brevo SMTP
+    # Send official Welcome Email via Zoho SMTP (non-blocking try/except)
     welcome_html = f"""
-    <div style="font-family: Arial, sans-serif; background-color: #0b1120; color: #f8fafc; padding: 30px; border-radius: 12px; max-width: 560px; margin: auto;">
-        <h2 style="color: #10b981; margin-bottom: 5px;">Welcome to SupiriPOS PRO!</h2>
-        <p style="color: #94a3b8; font-size: 14px; margin-top: 0;">Powered by {SMTP_FROM_NAME} (pos.prasatek.lk)</p>
-        <p style="font-size: 14px; color: #e2e8f0;">Hello <strong>{new_biz.owner_name}</strong>,</p>
-        <p style="font-size: 14px; color: #cbd5e1; line-height: 1.5;">
-            Your cloud POS terminal for <strong>{new_biz.name}</strong> has been successfully activated! Keep your credentials below safe:
-        </p>
-        <div style="background: rgba(255,255,255,0.05); padding: 18px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.3); margin: 20px 0;">
-            <p style="margin: 6px 0; font-size: 14px;"><strong>Business Code:</strong> <span style="color: #06b6d4; font-family: monospace; font-size: 16px;">{business_code}</span></p>
-            <p style="margin: 6px 0; font-size: 14px;"><strong>Master Password:</strong> <span style="color: #10b981; font-family: monospace; font-size: 16px;">{req.master_password}</span></p>
-            <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 12px 0;" />
-            <p style="margin: 6px 0; font-size: 13px; color: #f59e0b;"><strong>First-Time Admin POS Login:</strong> Username: <code>user</code> | Password: <code>123</code> (You will be prompted to set your personal Admin credentials on first login).</p>
-        </div>
-        <p style="font-size: 12px; color: #64748b;">Support: {SMTP_FROM_EMAIL} | {SMTP_FROM_NAME}</p>
-    </div>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Welcome to SupiriPOS PRO</title>
+    </head>
+    <body style="margin: 0; padding: 30px 15px; background-color: #0b1120; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #f8fafc;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 580px; margin: 0 auto; background-color: #0f172a; border-radius: 16px; border: 1px solid #1e293b; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);">
+            <tr>
+                <td style="padding: 32px 28px 24px 28px; text-align: left;">
+                    <div style="margin-bottom: 4px;">
+                        <span style="font-size: 24px; font-weight: 800; color: #10b981; letter-spacing: -0.5px;">SupiriPOS <span style="color: #38bdf8;">PRO</span></span>
+                    </div>
+                    <p style="margin: 0 0 16px 0; font-size: 13px; color: #94a3b8; font-weight: 500;">Next-Gen Cloud Point of Sale System</p>
+                    <div style="height: 1px; width: 100%; background: linear-gradient(90deg, #10b981 0%, rgba(16, 185, 129, 0.1) 100%); margin-bottom: 24px;"></div>
+
+                    <h2 style="margin: 0 0 10px 0; font-size: 22px; font-weight: 700; color: #f8fafc;">🎉 Congratulations &amp; Welcome to SupiriPOS PRO!</h2>
+                    <p style="margin: 0 0 8px 0; font-size: 15px; color: #e2e8f0;">Hello <strong>{new_biz.owner_name}</strong>,</p>
+                    <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #cbd5e1;">
+                        Your cloud POS store account for <strong>{new_biz.name}</strong> has been successfully registered and initialized! You can now start managing inventory, processing rapid sales, and tracking real-time profits.
+                    </p>
+
+                    <div style="background: #1e293b; border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 12px; padding: 22px 20px; margin: 24px 0;">
+                        <h3 style="margin: 0 0 14px 0; font-size: 13px; font-weight: 700; color: #10b981; text-transform: uppercase; letter-spacing: 1px;">Store Credentials &amp; Access</h3>
+                        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                            <tr>
+                                <td style="padding: 7px 0; color: #94a3b8; width: 42%;">Store / Business Name:</td>
+                                <td style="padding: 7px 0; color: #f8fafc; font-weight: 700;">{new_biz.name}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 7px 0; color: #94a3b8;">Location / Store Code:</td>
+                                <td style="padding: 7px 0; color: #38bdf8; font-family: monospace; font-weight: 700; font-size: 16px;">{business_code}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 7px 0; color: #94a3b8;">Master Password:</td>
+                                <td style="padding: 7px 0; color: #10b981; font-family: monospace; font-weight: 700; font-size: 16px;">{req.master_password}</td>
+                            </tr>
+                        </table>
+
+                        <div style="margin-top: 16px; padding-top: 14px; border-top: 1px dashed rgba(255,255,255,0.12);">
+                            <p style="margin: 0 0 4px 0; font-size: 12px; font-weight: 700; color: #fbbf24;">⚡ Initial Admin POS Login:</p>
+                            <p style="margin: 0; font-size: 13px; color: #cbd5e1;">
+                                Username: <span style="background: rgba(0,0,0,0.4); padding: 2px 7px; border-radius: 4px; color: #ffffff; font-family: monospace; font-weight: 600;">user</span>
+                                &nbsp;&nbsp;|&nbsp;&nbsp;
+                                Password: <span style="background: rgba(0,0,0,0.4); padding: 2px 7px; border-radius: 4px; color: #ffffff; font-family: monospace; font-weight: 600;">123</span>
+                            </p>
+                            <p style="margin: 6px 0 0 0; font-size: 11px; color: #94a3b8;">(You will be prompted to set your personal Admin credentials upon first login)</p>
+                        </div>
+                    </div>
+
+                    <div style="background: rgba(245, 158, 11, 0.08); border-left: 4px solid #f59e0b; border-radius: 6px; padding: 12px 16px; margin: 20px 0;">
+                        <p style="margin: 0; font-size: 12px; line-height: 1.5; color: #fde68a;">
+                            🔒 <strong>Security Tip:</strong> Please keep your Location / Store Code and Master Password strictly confidential. Never share your Master Password with cashiers or unauthorized personnel.
+                        </p>
+                    </div>
+
+                    <p style="font-size: 13px; color: #94a3b8; line-height: 1.6; margin: 0 0 24px 0;">
+                        Need assistance getting started or connecting receipt printers, barcode scanners, and scales? Our technical support team is ready to help you anytime.
+                    </p>
+
+                    <div style="border-top: 1px solid #1e293b; padding-top: 20px; text-align: center;">
+                        <p style="margin: 0 0 6px 0; font-size: 13px; font-weight: 700; color: #f1f5f9;">PrasaTek System Solutions</p>
+                        <p style="margin: 0 0 6px 0; font-size: 12px; color: #94a3b8;">
+                            <a href="https://www.prasatek.lk" style="color: #10b981; text-decoration: none; font-weight: 600;">www.prasatek.lk</a>
+                            &nbsp;&bull;&nbsp;
+                            <a href="mailto:info@prasatek.lk" style="color: #38bdf8; text-decoration: none;">info@prasatek.lk</a>
+                        </p>
+                        <p style="margin: 0; font-size: 11px; color: #64748b; font-style: italic;">Smart POS &amp; Enterprise Software Solutions — Sri Lanka</p>
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
     """
-    send_smtp_email(
-        to_email=email_clean,
-        subject=f"Welcome to SupiriPOS PRO - Your Business Code: {business_code}",
-        html_content=welcome_html
+
+    welcome_plain = (
+        f"🎉 Congratulations & Welcome to SupiriPOS PRO!\n\n"
+        f"Hello {new_biz.owner_name},\n"
+        f"Your cloud POS store account for '{new_biz.name}' has been successfully registered!\n\n"
+        f"--- STORE CREDENTIALS & ACCESS ---\n"
+        f"Store / Business Name: {new_biz.name}\n"
+        f"Location / Store Code: {business_code}\n"
+        f"Master Password: {req.master_password}\n\n"
+        f"--- INITIAL ADMIN POS LOGIN ---\n"
+        f"Username: user\n"
+        f"Password: 123\n"
+        f"(You will be prompted to set your personal Admin credentials on first login)\n\n"
+        f"SECURITY TIP: Please keep your Store Code and Master Password strictly confidential. "
+        f"Never share your Master Password with cashiers or unauthorized personnel.\n\n"
+        f"----------------------------------------\n"
+        f"PrasaTek System Solutions\n"
+        f"Website: https://www.prasatek.lk\n"
+        f"Support: info@prasatek.lk\n"
+        f"Smart POS & Enterprise Software Solutions — Sri Lanka\n"
     )
+
+    try:
+        send_smtp_email(
+            to_email=email_clean,
+            subject=f"🎉 Congratulations! Your SupiriPOS PRO Account is Ready",
+            html_content=welcome_html,
+            plain_text=welcome_plain
+        )
+    except Exception as email_err:
+        logger.warning(f"[WELCOME EMAIL ERROR] Could not send welcome email to {email_clean}: {email_err}")
 
     logger.info(f"[REGISTER] New Business registered: {business_code} ({req.shop_name})")
 

@@ -477,7 +477,8 @@
     }
 
     /* Strict Tab Isolation & 100% Responsive Display Fit */
-    html, body {
+    html,
+    body {
       width: 100%;
       max-width: 100vw;
       overflow-x: hidden;
@@ -685,6 +686,7 @@
         <div id="db-connection-pill" class="badge badge-emerald">
           <span class="pulse-dot"></span>
           <span id="db-status-text">Cloud Engine Active</span>
+          <span id="db-status-text">SUPABASE CLOUD ONLINE</span>
         </div>
         <button class="btn btn-glass btn-sm" onclick="openUserGuideModal()">
           <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
@@ -722,6 +724,9 @@
           style="color: var(--text-muted); font-size: 16px; max-width: 760px; margin: 0 auto 30px auto; line-height: 1.6;">
           Real-time multi-device synchronization across counters, Supabase PostgreSQL cloud sync with offline SQLite
           resilience, thermal receipt printing (80mm & 58mm), and granular role-based staff permissions.
+          Real-time multi-device synchronization across counters, Supabase PostgreSQL cloud database engine with
+          high-speed in-memory caching, thermal receipt printing (80mm & 58mm), and granular role-based staff
+          permissions.
         </p>
 
         <!-- 3 Prominent Action Gateways -->
@@ -822,6 +827,7 @@
           <div style="text-align: left;">
             <div style="font-size: 14px; font-weight: 700;">Supabase Cloud DB</div>
             <div style="font-size: 11px; color: var(--text-muted);">With SQLite Fallback</div>
+            <div style="font-size: 11px; color: var(--text-muted);">High-Speed Cloud Engine</div>
           </div>
         </div>
         <div style="display: flex; align-items: center; gap: 12px; justify-content: center;">
@@ -912,7 +918,8 @@
   <!-- ========================================================================= -->
   <!-- VIEW 3: MAIN POS WORKSPACE (THE 5 CORE PAGES)                              -->
   <!-- ========================================================================= -->
-  <div id="view-workspace" style="display: none; flex-direction: column; min-height: 100vh; width: 100%; max-width: 100vw; overflow-x: hidden;">
+  <div id="view-workspace"
+    style="display: none; flex-direction: column; min-height: 100vh; width: 100%; max-width: 100vw; overflow-x: hidden;">
 
     <!-- Top System Header Bar (Zero-overflow, fits 100% of buttons at 100% laptop zoom) -->
     <header
@@ -922,16 +929,23 @@
       <div style="display: flex; align-items: center; gap: 8px; min-width: 0; flex-shrink: 0;">
         <img id="ws-shop-logo" src="/assets/logo.png" alt="SupiriPOS PRO Logo"
           style="width: 38px; height: 38px; object-fit: contain; flex-shrink: 0;">
-        <div style="display: flex; flex-direction: column; justify-content: center; gap: 2px; line-height: 1.15; min-width: 0;">
+        <div
+          style="display: flex; flex-direction: column; justify-content: center; gap: 2px; line-height: 1.15; min-width: 0;">
           <div style="display: flex; align-items: center;">
-            <span id="ws-shop-code" class="badge badge-cyan" style="font-size: 11px; font-weight: 800; padding: 1px 7px; flex-shrink: 0;">PT-DEMO</span>
+            <span id="ws-shop-code" class="badge badge-cyan"
+              style="font-size: 11px; font-weight: 800; padding: 1px 7px; flex-shrink: 0;">PT-DEMO</span>
           </div>
           <div style="display: flex; flex-direction: column; gap: 1px; line-height: 1.15; min-width: 0;">
-            <div style="display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; white-space: nowrap;">
+            <div
+              style="display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; white-space: nowrap;">
               <span id="ws-sync-dot" class="pulse-dot" style="width: 7px; height: 7px; flex-shrink: 0;"></span>
               <span id="ws-sync-status" style="color: var(--emerald);">Online • Synced</span>
             </div>
-            <span id="ws-db-badge" style="font-size: 10.5px; color: #06b6d4; font-weight: 700; white-space: nowrap;">Supabase Cloud</span>
+            <span id="ws-db-badge"
+              style="font-size: 10.5px; color: #06b6d4; font-weight: 700; white-space: nowrap;">Supabase Cloud</span>
+            <span id="ws-db-badge"
+              style="font-size: 10.5px; color: #10b981; font-weight: 700; white-space: nowrap;">SUPABASE CLOUD
+              ONLINE</span>
           </div>
         </div>
       </div>
@@ -939,22 +953,34 @@
       <!-- Center: All 6 Navigation Tabs (Readable Sizing Without Pushing Right Controls Off-Screen) -->
       <nav id="pos-nav-tabs"
         style="display: flex; align-items: center; justify-content: center; gap: 4px; background: rgba(15, 23, 42, 0.78); padding: 4px; border-radius: 12px; border: 1px solid var(--border-glass); min-width: 0; flex: 0 1 auto; flex-wrap: nowrap; overflow-x: auto;">
-        <button id="nav-btn-dashboard" class="btn btn-sm btn-cyan" style="padding: 7px 11px; font-size: 13px; font-weight: 600; border-radius: 9px; gap: 5px; white-space: nowrap; flex-shrink: 0;" onclick="switchPOSTab('dashboard')">
+        <button id="nav-btn-dashboard" class="btn btn-sm btn-cyan"
+          style="padding: 7px 11px; font-size: 13px; font-weight: 600; border-radius: 9px; gap: 5px; white-space: nowrap; flex-shrink: 0;"
+          onclick="switchPOSTab('dashboard')">
           📊 Dashboard
         </button>
-        <button id="nav-btn-billing" class="btn btn-sm btn-glass" style="padding: 7px 11px; font-size: 13px; font-weight: 600; border-radius: 9px; gap: 5px; white-space: nowrap; flex-shrink: 0;" onclick="switchPOSTab('billing')">
+        <button id="nav-btn-billing" class="btn btn-sm btn-glass"
+          style="padding: 7px 11px; font-size: 13px; font-weight: 600; border-radius: 9px; gap: 5px; white-space: nowrap; flex-shrink: 0;"
+          onclick="switchPOSTab('billing')">
           🛒 Billing
         </button>
-        <button id="nav-btn-items" class="btn btn-sm btn-glass" style="padding: 7px 11px; font-size: 13px; font-weight: 600; border-radius: 9px; gap: 5px; white-space: nowrap; flex-shrink: 0;" onclick="switchPOSTab('items')">
+        <button id="nav-btn-items" class="btn btn-sm btn-glass"
+          style="padding: 7px 11px; font-size: 13px; font-weight: 600; border-radius: 9px; gap: 5px; white-space: nowrap; flex-shrink: 0;"
+          onclick="switchPOSTab('items')">
           📦 Products
         </button>
-        <button id="nav-btn-stock" class="btn btn-sm btn-glass" style="padding: 7px 11px; font-size: 13px; font-weight: 600; border-radius: 9px; gap: 5px; white-space: nowrap; flex-shrink: 0;" onclick="switchPOSTab('stock')">
+        <button id="nav-btn-stock" class="btn btn-sm btn-glass"
+          style="padding: 7px 11px; font-size: 13px; font-weight: 600; border-radius: 9px; gap: 5px; white-space: nowrap; flex-shrink: 0;"
+          onclick="switchPOSTab('stock')">
           📋 Stock
         </button>
-        <button id="nav-btn-users" class="btn btn-sm btn-glass" style="padding: 7px 11px; font-size: 13px; font-weight: 600; border-radius: 9px; gap: 5px; white-space: nowrap; flex-shrink: 0;" onclick="switchPOSTab('users')">
+        <button id="nav-btn-users" class="btn btn-sm btn-glass"
+          style="padding: 7px 11px; font-size: 13px; font-weight: 600; border-radius: 9px; gap: 5px; white-space: nowrap; flex-shrink: 0;"
+          onclick="switchPOSTab('users')">
           👥 Staff
         </button>
-        <button id="nav-btn-reports" class="btn btn-sm btn-glass" style="padding: 7px 11px; font-size: 13px; font-weight: 600; border-radius: 9px; gap: 5px; white-space: nowrap; flex-shrink: 0;" onclick="switchPOSTab('reports')">
+        <button id="nav-btn-reports" class="btn btn-sm btn-glass"
+          style="padding: 7px 11px; font-size: 13px; font-weight: 600; border-radius: 9px; gap: 5px; white-space: nowrap; flex-shrink: 0;"
+          onclick="switchPOSTab('reports')">
           📈 Reports
         </button>
       </nav>
@@ -964,20 +990,30 @@
         <div class="badge"
           style="background: rgba(255, 255, 255, 0.06); border: 1px solid var(--border-glass); padding: 6px 10px; font-size: 12.5px; font-weight: 600; color: #f8fafc; text-transform: none; white-space: nowrap; display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
           <span>👤</span>
-          <span id="ws-staff-user" style="max-width: 105px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block;">Supiri Admin</span>
-          <span id="ws-staff-role" class="hide-below-2xl" style="color: var(--cyan); font-size: 11.5px;">• Manager</span>
+          <span id="ws-staff-user"
+            style="max-width: 105px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block;">Supiri
+            Admin</span>
+          <span id="ws-staff-role" class="hide-below-2xl" style="color: var(--cyan); font-size: 11.5px;">•
+            Manager</span>
         </div>
 
         <span id="ws-clock" class="hide-below-2xl"
-          style="font-family: var(--font-mono); font-size: 12.5px; color: var(--text-muted); font-weight: 600; min-width: 74px; text-align: center;">12:00:00 PM</span>
+          style="font-family: var(--font-mono); font-size: 12.5px; color: var(--text-muted); font-weight: 600; min-width: 74px; text-align: center;">12:00:00
+          PM</span>
 
-        <button class="btn btn-glass btn-sm" style="padding: 7px 11px; font-size: 12.5px; border-radius: 9px; gap: 5px; flex-shrink: 0;" onclick="openUserGuideModal()" title="Help Guide">
+        <button class="btn btn-glass btn-sm"
+          style="padding: 7px 11px; font-size: 12.5px; border-radius: 9px; gap: 5px; flex-shrink: 0;"
+          onclick="openUserGuideModal()" title="Help Guide">
           📖 Guide
         </button>
-        <button class="btn btn-glass btn-sm" style="padding: 7px 9px; font-size: 12.5px; border-radius: 9px; flex-shrink: 0;" onclick="toggleFullscreen()" title="Full Screen">
+        <button class="btn btn-glass btn-sm"
+          style="padding: 7px 9px; font-size: 12.5px; border-radius: 9px; flex-shrink: 0;" onclick="toggleFullscreen()"
+          title="Full Screen">
           ⛶
         </button>
-        <button class="btn btn-danger btn-sm" style="padding: 7px 11px; font-size: 12.5px; border-radius: 9px; gap: 5px; flex-shrink: 0;" onclick="logoutStaffUser()" title="Logout Staff User">
+        <button class="btn btn-danger btn-sm"
+          style="padding: 7px 11px; font-size: 12.5px; border-radius: 9px; gap: 5px; flex-shrink: 0;"
+          onclick="logoutStaffUser()" title="Logout Staff User">
           🚪 Logout
         </button>
       </div>
@@ -999,63 +1035,83 @@
           <div class="glass-panel"
             style="padding: 15px 16px; min-width: 0; border-color: rgba(16, 185, 129, 0.4); background: linear-gradient(180deg, rgba(16, 185, 129, 0.1) 0%, rgba(15, 23, 42, 0.7) 100%);">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
-              <span style="font-size: 12.5px; font-weight: 700; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">💰 TODAY'S SALES (අද ආදායම)</span>
+              <span
+                style="font-size: 12.5px; font-weight: 700; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">💰
+                TODAY'S SALES (අද ආදායම)</span>
               <span style="font-size: 16px; flex-shrink: 0;">💵</span>
             </div>
             <div id="dash-kpi-today-sales"
               style="font-size: clamp(22px, 1.8vw, 28px); font-weight: 800; color: var(--emerald); font-family: var(--font-mono); margin: 6px 0 3px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
               Rs. 0.00</div>
-            <div id="dash-kpi-today-bills" style="font-size: 12.5px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">0 bills completed today</div>
+            <div id="dash-kpi-today-bills"
+              style="font-size: 12.5px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              0 bills completed today</div>
           </div>
 
           <!-- Card 2: 7 Days Sales -->
           <div class="glass-panel"
             style="padding: 15px 16px; min-width: 0; border-color: rgba(6, 182, 212, 0.4); background: linear-gradient(180deg, rgba(6, 182, 212, 0.1) 0%, rgba(15, 23, 42, 0.7) 100%);">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
-              <span style="font-size: 12.5px; font-weight: 700; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">📅 LAST 7 DAYS (පසුගිය සතිය)</span>
+              <span
+                style="font-size: 12.5px; font-weight: 700; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">📅
+                LAST 7 DAYS (පසුගිය සතිය)</span>
               <span style="font-size: 16px; flex-shrink: 0;">📈</span>
             </div>
             <div id="dash-kpi-week-sales"
               style="font-size: clamp(22px, 1.8vw, 28px); font-weight: 800; color: var(--cyan); font-family: var(--font-mono); margin: 6px 0 3px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
               Rs. 0.00</div>
-            <div style="font-size: 12.5px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Weekly revenue stream</div>
+            <div
+              style="font-size: 12.5px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              Weekly revenue stream</div>
           </div>
 
           <!-- Card 3: 30 Days Sales -->
           <div class="glass-panel"
             style="padding: 15px 16px; min-width: 0; border-color: rgba(147, 51, 234, 0.4); background: linear-gradient(180deg, rgba(147, 51, 234, 0.1) 0%, rgba(15, 23, 42, 0.7) 100%);">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
-              <span style="font-size: 12.5px; font-weight: 700; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">📆 LAST 30 DAYS (පසුගිය මාසය)</span>
+              <span
+                style="font-size: 12.5px; font-weight: 700; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">📆
+                LAST 30 DAYS (පසුගිය මාසය)</span>
               <span style="font-size: 16px; flex-shrink: 0;">📊</span>
             </div>
             <div id="dash-kpi-month-sales"
               style="font-size: clamp(22px, 1.8vw, 28px); font-weight: 800; color: #c084fc; font-family: var(--font-mono); margin: 6px 0 3px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
               Rs. 0.00</div>
-            <div style="font-size: 12.5px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Monthly performance</div>
+            <div
+              style="font-size: 12.5px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              Monthly performance</div>
           </div>
 
           <!-- Card 4: Total Products -->
           <div class="glass-panel" style="padding: 15px 16px; min-width: 0; border-color: rgba(255, 255, 255, 0.15);">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
-              <span style="font-size: 12.5px; font-weight: 700; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">📦 TOTAL PRODUCTS (මුළු භාණ්ඩ)</span>
+              <span
+                style="font-size: 12.5px; font-weight: 700; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">📦
+                TOTAL PRODUCTS (මුළු භාණ්ඩ)</span>
               <span style="font-size: 16px; flex-shrink: 0;">🏷️</span>
             </div>
             <div id="dash-kpi-total-items"
               style="font-size: clamp(22px, 1.8vw, 28px); font-weight: 800; color: #ffffff; font-family: var(--font-mono); margin: 6px 0 3px 0;">
               0</div>
-            <div style="font-size: 12.5px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Active catalog SKUs</div>
+            <div
+              style="font-size: 12.5px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              Active catalog SKUs</div>
           </div>
 
           <!-- Card 5: Active Staff Users -->
           <div class="glass-panel" style="padding: 15px 16px; min-width: 0; border-color: rgba(59, 130, 246, 0.4);">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
-              <span style="font-size: 12.5px; font-weight: 700; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">👥 STAFF USERS (සේවකයින්)</span>
+              <span
+                style="font-size: 12.5px; font-weight: 700; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">👥
+                STAFF USERS (සේවකයින්)</span>
               <span style="font-size: 16px; flex-shrink: 0;">🧑‍💼</span>
             </div>
             <div id="dash-kpi-staff-count"
               style="font-size: clamp(22px, 1.8vw, 28px); font-weight: 800; color: #60a5fa; font-family: var(--font-mono); margin: 6px 0 3px 0;">
               1</div>
-            <div style="font-size: 12.5px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Authorized POS users</div>
+            <div
+              style="font-size: 12.5px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              Authorized POS users</div>
           </div>
 
           <!-- Card 6: INTERACTIVE Low Stock Alerts -->
@@ -1063,7 +1119,9 @@
             style="padding: 15px 16px; min-width: 0; border-color: rgba(245, 158, 11, 0.5); background: linear-gradient(180deg, rgba(245, 158, 11, 0.12) 0%, rgba(15, 23, 42, 0.7) 100%); cursor: pointer;"
             title="Click to view all low stock products & restock">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
-              <span style="font-size: 12.5px; font-weight: 700; color: var(--warning); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">⚠️ LOW STOCK (අඩු තොග)</span>
+              <span
+                style="font-size: 12.5px; font-weight: 700; color: var(--warning); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">⚠️
+                LOW STOCK (අඩු තොග)</span>
               <span class="badge badge-warning" style="font-size: 10px; padding: 2px 7px; flex-shrink: 0;">REVIEW</span>
             </div>
             <div id="dash-kpi-low-stock"
@@ -1252,10 +1310,12 @@
             <div id="billing-credit-customer-panel"
               style="display: none; flex-direction: column; gap: 7px; background: rgba(15, 23, 42, 0.92); border: 1px solid rgba(245, 158, 11, 0.55); border-radius: 10px; padding: 9px 11px; margin-bottom: 8px; box-shadow: 0 4px 16px rgba(245, 158, 11, 0.15);">
               <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
-                <span style="font-size: 12px; font-weight: 800; color: var(--warning); display: flex; align-items: center; gap: 5px;">
+                <span
+                  style="font-size: 12px; font-weight: 800; color: var(--warning); display: flex; align-items: center; gap: 5px;">
                   👤 Credit Customer (ණය ගනුදෙනුකරු)
                 </span>
-                <span id="billing-credit-status-badge" class="badge badge-warning" style="font-size: 10px; padding: 2px 7px;">Required</span>
+                <span id="billing-credit-status-badge" class="badge badge-warning"
+                  style="font-size: 10px; padding: 2px 7px;">Required</span>
               </div>
 
               <div style="display: flex; gap: 6px; align-items: center;">
@@ -1264,8 +1324,8 @@
                   placeholder="Enter Mobile Number (e.g. 0771234567)..."
                   oninput="handleBillingCreditPhoneInput(this.value)" autocomplete="off">
                 <button type="button" class="btn btn-sm btn-emerald whitespace-nowrap"
-                  style="padding: 6px 10px; font-size: 12px; flex-shrink: 0;"
-                  onclick="openAddCreditCustomerModal(true)" title="Register a new Credit Customer">
+                  style="padding: 6px 10px; font-size: 12px; flex-shrink: 0;" onclick="openAddCreditCustomerModal(true)"
+                  title="Register a new Credit Customer">
                   ➕ New
                 </button>
               </div>
@@ -1273,21 +1333,30 @@
               <!-- Matched Customer Glowing Card -->
               <div id="billing-credit-found-card"
                 style="display: none; background: linear-gradient(135deg, rgba(16, 185, 129, 0.14) 0%, rgba(6, 182, 212, 0.14) 100%); border: 1px solid rgba(16, 185, 129, 0.55); border-radius: 8px; padding: 8px 10px; font-size: 12px;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; margin-bottom: 4px;">
+                <div
+                  style="display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; margin-bottom: 4px;">
                   <div style="min-width: 0;">
-                    <div id="billing-credit-cust-name" style="font-weight: 800; color: #ffffff; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Customer Name</div>
-                    <div id="billing-credit-cust-address" style="color: var(--text-muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Address</div>
+                    <div id="billing-credit-cust-name"
+                      style="font-weight: 800; color: #ffffff; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                      Customer Name</div>
+                    <div id="billing-credit-cust-address"
+                      style="color: var(--text-muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                      Address</div>
                   </div>
-                  <span class="badge badge-emerald" style="font-size: 10px; padding: 2px 6px; flex-shrink: 0;">✓ Selected</span>
+                  <span class="badge badge-emerald" style="font-size: 10px; padding: 2px 6px; flex-shrink: 0;">✓
+                    Selected</span>
                 </div>
-                <div style="border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 5px; display: flex; flex-direction: column; gap: 2px;">
+                <div
+                  style="border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 5px; display: flex; flex-direction: column; gap: 2px;">
                   <div style="display: flex; justify-content: space-between; color: var(--text-muted);">
                     <span>පෙර පැවති ණය ශේෂය (Existing):</span>
-                    <span id="billing-credit-prev-balance" style="font-family: var(--font-mono); font-weight: 700; color: var(--warning);">Rs. 0.00</span>
+                    <span id="billing-credit-prev-balance"
+                      style="font-family: var(--font-mono); font-weight: 700; color: var(--warning);">Rs. 0.00</span>
                   </div>
                   <div style="display: flex; justify-content: space-between; color: #ffffff; font-weight: 700;">
                     <span>මෙම බිලෙන් පසු මුළු ණය (New Total):</span>
-                    <span id="billing-credit-new-balance" style="font-family: var(--font-mono); font-weight: 800; color: var(--cyan);">Rs. 0.00</span>
+                    <span id="billing-credit-new-balance"
+                      style="font-family: var(--font-mono); font-weight: 800; color: var(--cyan);">Rs. 0.00</span>
                   </div>
                 </div>
               </div>
@@ -1296,7 +1365,8 @@
               <div id="billing-credit-notfound-card"
                 style="display: none; align-items: center; justify-content: space-between; gap: 8px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 8px; padding: 7px 10px;">
                 <span style="font-size: 12px; color: #fca5a5; font-weight: 600;">Customer not found</span>
-                <button type="button" class="btn btn-sm btn-emerald" style="padding: 4px 10px; font-size: 12px; white-space: nowrap;"
+                <button type="button" class="btn btn-sm btn-emerald"
+                  style="padding: 4px 10px; font-size: 12px; white-space: nowrap;"
                   onclick="openAddCreditCustomerModal(true)">
                   ➕ Add New Customer
                 </button>
@@ -1318,14 +1388,17 @@
             <!-- Cash Tendered Input & Balance / Change -->
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
               <div>
-                <label id="bill-cash-received-label" style="font-size: 12px; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 3px;">Cash
+                <label id="bill-cash-received-label"
+                  style="font-size: 12px; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 3px;">Cash
                   Received (රු.)</label>
                 <input type="number" id="bill-cash-received" class="form-control"
                   style="font-size: 16px; font-weight: 700; font-family: var(--font-mono); color: #ffffff; padding: 7px 10px;"
                   placeholder="0.00" oninput="calculateBillTotals()">
               </div>
               <div style="text-align: right;">
-                <label id="bill-change-due-label" style="font-size: 12px; color: var(--emerald); font-weight: 600; display: block; margin-bottom: 3px;">Balance /
+                <label id="bill-change-due-label"
+                  style="font-size: 12px; color: var(--emerald); font-weight: 600; display: block; margin-bottom: 3px;">Balance
+                  /
                   Change (ඉතුරු)</label>
                 <div id="bill-change-due"
                   style="font-size: 20px; font-weight: 800; font-family: var(--font-mono); color: var(--emerald); padding-top: 4px;">
@@ -1350,8 +1423,9 @@
         <div class="glass-panel"
           style="padding: 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
           <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; flex-wrap: wrap;">
-            <input type="text" id="items-search-input" class="form-control" style="max-width: 340px; min-width: 200px; flex: 1;"
-              placeholder="🔍 Search product name or barcode..." oninput="loadItemsTable()">
+            <input type="text" id="items-search-input" class="form-control"
+              style="max-width: 340px; min-width: 200px; flex: 1;" placeholder="🔍 Search product name or barcode..."
+              oninput="loadItemsTable()">
             <select id="items-category-filter" class="form-control" style="max-width: 200px; min-width: 150px;"
               onchange="loadItemsTable()">
               <option value="All">All Categories</option>
@@ -1448,17 +1522,17 @@
 
             <div class="form-group lg:col-span-1 min-w-0 w-full" style="margin: 0;">
               <label class="form-label">Quantity</label>
-              <input type="number" id="stock-adjust-qty" class="form-control min-w-0 w-full" style="font-family: var(--font-mono);"
-                min="1" step="any" placeholder="Qty" required>
+              <input type="number" id="stock-adjust-qty" class="form-control min-w-0 w-full"
+                style="font-family: var(--font-mono);" min="1" step="any" placeholder="Qty" required>
             </div>
 
             <div class="form-group lg:col-span-2 min-w-0 w-full" style="margin: 0;">
               <label class="form-label">Note / Supplier Reference</label>
-              <input type="text" id="stock-adjust-note" class="form-control min-w-0 w-full"
-                placeholder="e.g. GRN-402">
+              <input type="text" id="stock-adjust-note" class="form-control min-w-0 w-full" placeholder="e.g. GRN-402">
             </div>
 
-            <button type="submit" class="btn btn-emerald lg:col-span-2 w-full whitespace-nowrap px-4 py-2.5" style="height: 44px;">
+            <button type="submit" class="btn btn-emerald lg:col-span-2 w-full whitespace-nowrap px-4 py-2.5"
+              style="height: 44px;">
               Update Stock
             </button>
           </form>
@@ -1553,10 +1627,12 @@
           </div>
 
           <div id="reports-export-container" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-            <button class="btn btn-sm btn-emerald" onclick="exportReportCSV()" title="Export currently filtered transactions to CSV / Excel">
+            <button class="btn btn-sm btn-emerald" onclick="exportReportCSV()"
+              title="Export currently filtered transactions to CSV / Excel">
               📥 Export to CSV / Excel
             </button>
-            <button class="btn btn-sm btn-cyan" onclick="printSalesReportPDF()" title="Print formatted report or save as PDF">
+            <button class="btn btn-sm btn-cyan" onclick="printSalesReportPDF()"
+              title="Print formatted report or save as PDF">
               🖨️ Print Report / Save as PDF
             </button>
           </div>
@@ -1567,15 +1643,22 @@
           style="display: flex; flex-direction: column; gap: 16px;">
 
           <!-- Advanced Date Range & Multi-Filter Control Panel -->
-          <div class="glass-panel" style="padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; border-color: rgba(6, 182, 212, 0.3);">
+          <div class="glass-panel"
+            style="padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; border-color: rgba(6, 182, 212, 0.3);">
             <!-- Row 1: Quick Date Range Pills & Custom Date Picker -->
-            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; border-bottom: 1px solid var(--border-glass); padding-bottom: 12px;">
+            <div
+              style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; border-bottom: 1px solid var(--border-glass); padding-bottom: 12px;">
               <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                <span style="font-size: 12.5px; font-weight: 700; color: var(--text-muted); margin-right: 4px;">📅 Period:</span>
-                <button class="btn btn-sm btn-cyan report-range-btn" data-range="today" onclick="selectReportRange('today')">Today</button>
-                <button class="btn btn-sm btn-glass report-range-btn" data-range="yesterday" onclick="selectReportRange('yesterday')">Yesterday</button>
-                <button class="btn btn-sm btn-glass report-range-btn" data-range="this_week" onclick="selectReportRange('this_week')">This Week</button>
-                <button class="btn btn-sm btn-glass report-range-btn" data-range="this_month" onclick="selectReportRange('this_month')">This Month</button>
+                <span style="font-size: 12.5px; font-weight: 700; color: var(--text-muted); margin-right: 4px;">📅
+                  Period:</span>
+                <button class="btn btn-sm btn-cyan report-range-btn" data-range="today"
+                  onclick="selectReportRange('today')">Today</button>
+                <button class="btn btn-sm btn-glass report-range-btn" data-range="yesterday"
+                  onclick="selectReportRange('yesterday')">Yesterday</button>
+                <button class="btn btn-sm btn-glass report-range-btn" data-range="this_week"
+                  onclick="selectReportRange('this_week')">This Week</button>
+                <button class="btn btn-sm btn-glass report-range-btn" data-range="this_month"
+                  onclick="selectReportRange('this_month')">This Month</button>
               </div>
 
               <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
@@ -1590,7 +1673,8 @@
             </div>
 
             <!-- Row 2: Search Input + Staff Member Filter + Payment Method Filter + Reset -->
-            <div style="display: grid; grid-template-columns: minmax(220px, 2fr) minmax(160px, 1fr) minmax(160px, 1fr) auto; gap: 12px; align-items: center;">
+            <div
+              style="display: grid; grid-template-columns: minmax(220px, 2fr) minmax(160px, 1fr) minmax(160px, 1fr) auto; gap: 12px; align-items: center;">
               <div style="position: relative;">
                 <input type="text" id="report-search-input" class="form-control"
                   style="width: 100%; padding: 8px 12px 8px 34px; font-size: 13.5px;"
@@ -1600,15 +1684,17 @@
               </div>
 
               <div style="display: flex; align-items: center; gap: 6px;">
-                <select id="report-staff-filter" class="form-control" style="width: 100%; padding: 8px 12px; font-size: 13.5px;"
-                  onchange="applyReportClientFilters()" title="Filter by Staff Member">
+                <select id="report-staff-filter" class="form-control"
+                  style="width: 100%; padding: 8px 12px; font-size: 13.5px;" onchange="applyReportClientFilters()"
+                  title="Filter by Staff Member">
                   <option value="ALL">👤 All Staff Members</option>
                 </select>
               </div>
 
               <div style="display: flex; align-items: center; gap: 6px;">
-                <select id="report-payment-filter" class="form-control" style="width: 100%; padding: 8px 12px; font-size: 13.5px;"
-                  onchange="applyReportClientFilters()" title="Filter by Payment Method">
+                <select id="report-payment-filter" class="form-control"
+                  style="width: 100%; padding: 8px 12px; font-size: 13.5px;" onchange="applyReportClientFilters()"
+                  title="Filter by Payment Method">
                   <option value="ALL">💳 All Payment Methods</option>
                   <option value="Cash">💵 Cash</option>
                   <option value="Card">💳 Card</option>
@@ -1617,7 +1703,8 @@
                 </select>
               </div>
 
-              <button class="btn btn-sm btn-glass" onclick="resetReportFilters()" title="Clear search and dropdown filters">
+              <button class="btn btn-sm btn-glass" onclick="resetReportFilters()"
+                title="Clear search and dropdown filters">
                 ↺ Reset Filters
               </button>
             </div>
@@ -1626,19 +1713,23 @@
           <!-- 5 Real-Time KPI Summary Cards (Dynamically Updated by Active Filters) -->
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
             <!-- Card 1: Total Revenue (Gross Sales) -->
-            <div class="glass-panel" style="padding: 16px 18px; border-color: rgba(16, 185, 129, 0.45); background: linear-gradient(180deg, rgba(16, 185, 129, 0.1) 0%, rgba(15, 23, 42, 0.75) 100%);">
+            <div class="glass-panel"
+              style="padding: 16px 18px; border-color: rgba(16, 185, 129, 0.45); background: linear-gradient(180deg, rgba(16, 185, 129, 0.1) 0%, rgba(15, 23, 42, 0.75) 100%);">
               <div style="display: flex; align-items: center; justify-content: space-between;">
-                <span style="font-size: 12px; color: var(--text-muted); font-weight: 700;">TOTAL REVENUE (GROSS SALES)</span>
+                <span style="font-size: 12px; color: var(--text-muted); font-weight: 700;">TOTAL REVENUE (GROSS
+                  SALES)</span>
                 <span style="font-size: 17px;">💰</span>
               </div>
               <div id="kpi-total-sales"
                 style="font-size: clamp(20px, 1.7vw, 26px); font-weight: 800; color: var(--emerald); font-family: var(--font-mono); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                 Rs. 0.00</div>
-              <div id="kpi-total-sales-sub" style="font-size: 12px; color: var(--text-dim); margin-top: 3px;">Paid sales in selection</div>
+              <div id="kpi-total-sales-sub" style="font-size: 12px; color: var(--text-dim); margin-top: 3px;">Paid sales
+                in selection</div>
             </div>
 
             <!-- Card 2: Estimated Net Profit -->
-            <div class="glass-panel" style="padding: 16px 18px; border-color: rgba(6, 182, 212, 0.45); background: linear-gradient(180deg, rgba(6, 182, 212, 0.1) 0%, rgba(15, 23, 42, 0.75) 100%);">
+            <div class="glass-panel"
+              style="padding: 16px 18px; border-color: rgba(6, 182, 212, 0.45); background: linear-gradient(180deg, rgba(6, 182, 212, 0.1) 0%, rgba(15, 23, 42, 0.75) 100%);">
               <div style="display: flex; align-items: center; justify-content: space-between;">
                 <span style="font-size: 12px; color: var(--text-muted); font-weight: 700;">ESTIMATED NET PROFIT</span>
                 <span style="font-size: 17px;">📈</span>
@@ -1646,23 +1737,27 @@
               <div id="kpi-net-profit"
                 style="font-size: clamp(20px, 1.7vw, 26px); font-weight: 800; color: var(--cyan); font-family: var(--font-mono); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                 Rs. 0.00</div>
-              <div id="kpi-net-profit-sub" style="font-size: 12px; color: var(--text-dim); margin-top: 3px;">Margin: 0.0%</div>
+              <div id="kpi-net-profit-sub" style="font-size: 12px; color: var(--text-dim); margin-top: 3px;">Margin:
+                0.0%</div>
             </div>
 
             <!-- Card 3: Total Transactions / Bills Count -->
             <div class="glass-panel" style="padding: 16px 18px; border-color: rgba(59, 130, 246, 0.4);">
               <div style="display: flex; align-items: center; justify-content: space-between;">
-                <span style="font-size: 12px; color: var(--text-muted); font-weight: 700;">TOTAL TRANSACTIONS / BILLS</span>
+                <span style="font-size: 12px; color: var(--text-muted); font-weight: 700;">TOTAL TRANSACTIONS /
+                  BILLS</span>
                 <span style="font-size: 17px;">🧾</span>
               </div>
               <div id="kpi-total-invoices"
                 style="font-size: clamp(20px, 1.7vw, 26px); font-weight: 800; color: #ffffff; font-family: var(--font-mono); margin-top: 6px;">
                 0</div>
-              <div id="kpi-total-items-sold" style="font-size: 12px; color: var(--text-dim); margin-top: 3px;">0 units sold</div>
+              <div id="kpi-total-items-sold" style="font-size: 12px; color: var(--text-dim); margin-top: 3px;">0 units
+                sold</div>
             </div>
 
             <!-- Card 4: Average Bill Value -->
-            <div class="glass-panel" style="padding: 16px 18px; border-color: rgba(147, 51, 234, 0.45); background: linear-gradient(180deg, rgba(147, 51, 234, 0.1) 0%, rgba(15, 23, 42, 0.75) 100%);">
+            <div class="glass-panel"
+              style="padding: 16px 18px; border-color: rgba(147, 51, 234, 0.45); background: linear-gradient(180deg, rgba(147, 51, 234, 0.1) 0%, rgba(15, 23, 42, 0.75) 100%);">
               <div style="display: flex; align-items: center; justify-content: space-between;">
                 <span style="font-size: 12px; color: var(--text-muted); font-weight: 700;">AVERAGE BILL VALUE</span>
                 <span style="font-size: 17px;">📊</span>
@@ -1670,11 +1765,13 @@
               <div id="kpi-avg-bill-value"
                 style="font-size: clamp(20px, 1.7vw, 26px); font-weight: 800; color: #c084fc; font-family: var(--font-mono); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                 Rs. 0.00</div>
-              <div id="kpi-avg-bill-sub" style="font-size: 12px; color: var(--text-dim); margin-top: 3px;">Per paid invoice</div>
+              <div id="kpi-avg-bill-sub" style="font-size: 12px; color: var(--text-dim); margin-top: 3px;">Per paid
+                invoice</div>
             </div>
 
             <!-- Card 5: Total Discounts Given -->
-            <div class="glass-panel" style="padding: 16px 18px; border-color: rgba(245, 158, 11, 0.45); background: linear-gradient(180deg, rgba(245, 158, 11, 0.1) 0%, rgba(15, 23, 42, 0.75) 100%);">
+            <div class="glass-panel"
+              style="padding: 16px 18px; border-color: rgba(245, 158, 11, 0.45); background: linear-gradient(180deg, rgba(245, 158, 11, 0.1) 0%, rgba(15, 23, 42, 0.75) 100%);">
               <div style="display: flex; align-items: center; justify-content: space-between;">
                 <span style="font-size: 12px; color: var(--text-muted); font-weight: 700;">TOTAL DISCOUNTS GIVEN</span>
                 <span style="font-size: 17px;">🏷️</span>
@@ -1682,7 +1779,8 @@
               <div id="kpi-total-discounts"
                 style="font-size: clamp(20px, 1.7vw, 26px); font-weight: 800; color: var(--warning); font-family: var(--font-mono); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                 Rs. 0.00</div>
-              <div style="font-size: 12px; color: var(--text-dim); margin-top: 3px;">Low Stock SKUs: <span id="kpi-low-stock-count" style="color: var(--warning); font-weight: 700;">0</span></div>
+              <div style="font-size: 12px; color: var(--text-dim); margin-top: 3px;">Low Stock SKUs: <span
+                  id="kpi-low-stock-count" style="color: var(--warning); font-weight: 700;">0</span></div>
             </div>
           </div>
 
@@ -1691,7 +1789,8 @@
             <!-- Left: Sales by Payment Method Breakdown -->
             <div class="glass-panel" style="padding: 16px 20px;">
               <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                <h3 style="font-size: 15px; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 8px;">
+                <h3
+                  style="font-size: 15px; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 8px;">
                   <span>💳 Sales by Payment Method</span>
                 </h3>
                 <span class="badge badge-cyan" style="font-size: 10.5px;">PAID BILLS</span>
@@ -1704,12 +1803,14 @@
             <!-- Right: Staff Performance Summary -->
             <div class="glass-panel" style="padding: 16px 20px;">
               <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                <h3 style="font-size: 15px; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 8px;">
+                <h3
+                  style="font-size: 15px; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 8px;">
                   <span>👥 Staff Performance Summary</span>
                 </h3>
                 <span class="badge badge-emerald" style="font-size: 10.5px;">BY CASHIER</span>
               </div>
-              <div id="report-staff-breakdown" style="display: flex; flex-direction: column; gap: 10px; max-height: 220px; overflow-y: auto; padding-right: 4px;">
+              <div id="report-staff-breakdown"
+                style="display: flex; flex-direction: column; gap: 10px; max-height: 220px; overflow-y: auto; padding-right: 4px;">
                 <!-- Populated dynamically by pos.js -->
               </div>
             </div>
@@ -1717,14 +1818,17 @@
 
           <!-- Sales Invoices History Table with Pagination & Smooth Scrolling -->
           <div class="glass-panel" style="padding: 20px; display: flex; flex-direction: column; gap: 12px;">
-            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div
+              style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
               <div>
                 <h3 style="font-size: 16px; font-weight: 700; color: #ffffff;">Sales & Invoice Transactions</h3>
-                <p style="font-size: 12.5px; color: var(--text-muted); margin-top: 2px;">Click any transaction row or <strong>"👁️ View"</strong> to inspect full bill items and reprint receipt.</p>
+                <p style="font-size: 12.5px; color: var(--text-muted); margin-top: 2px;">Click any transaction row or
+                  <strong>"👁️ View"</strong> to inspect full bill items and reprint receipt.</p>
               </div>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <label style="font-size: 12.5px; color: var(--text-muted);">Rows per page:</label>
-                <select id="reports-page-size" class="form-control" style="padding: 5px 10px; font-size: 12.5px; width: auto;" onchange="changeReportPageSize()">
+                <select id="reports-page-size" class="form-control"
+                  style="padding: 5px 10px; font-size: 12.5px; width: auto;" onchange="changeReportPageSize()">
                   <option value="25" selected>25 rows</option>
                   <option value="50">50 rows</option>
                   <option value="100">100 rows</option>
@@ -1733,10 +1837,12 @@
               </div>
             </div>
 
-            <div style="overflow-x: auto; max-height: 520px; overflow-y: auto; border: 1px solid var(--border-glass); border-radius: 12px;">
+            <div
+              style="overflow-x: auto; max-height: 520px; overflow-y: auto; border: 1px solid var(--border-glass); border-radius: 12px;">
               <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13.5px;">
                 <thead>
-                  <tr style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted); position: sticky; top: 0; background: #0f172a; z-index: 5;">
+                  <tr
+                    style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted); position: sticky; top: 0; background: #0f172a; z-index: 5;">
                     <th style="padding: 12px; white-space: nowrap;">Invoice #</th>
                     <th style="padding: 12px; white-space: nowrap;">Date & Time</th>
                     <th style="padding: 12px; white-space: nowrap;">Staff Member</th>
@@ -1755,14 +1861,18 @@
             </div>
 
             <!-- Pagination Footer -->
-            <div id="reports-pagination-bar" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding-top: 4px;">
+            <div id="reports-pagination-bar"
+              style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding-top: 4px;">
               <div id="reports-page-info" style="font-size: 13px; color: var(--text-muted);">
                 Showing 0 of 0 transactions
               </div>
               <div style="display: flex; align-items: center; gap: 6px;">
-                <button id="reports-prev-btn" class="btn btn-sm btn-glass" onclick="prevReportPage()" disabled>⬅ Prev</button>
-                <span id="reports-page-indicator" class="badge badge-cyan" style="font-family: var(--font-mono); font-size: 12px; padding: 5px 12px;">Page 1 / 1</span>
-                <button id="reports-next-btn" class="btn btn-sm btn-glass" onclick="nextReportPage()" disabled>Next ➔</button>
+                <button id="reports-prev-btn" class="btn btn-sm btn-glass" onclick="prevReportPage()" disabled>⬅
+                  Prev</button>
+                <span id="reports-page-indicator" class="badge badge-cyan"
+                  style="font-family: var(--font-mono); font-size: 12px; padding: 5px 12px;">Page 1 / 1</span>
+                <button id="reports-next-btn" class="btn btn-sm btn-glass" onclick="nextReportPage()" disabled>Next
+                  ➔</button>
               </div>
             </div>
           </div>
@@ -1785,7 +1895,8 @@
               <input type="date" id="bincard-start-date" class="form-control"
                 style="padding: 8px 12px; font-size: 13.5px;">
               <span style="color: var(--text-dim);">to</span>
-              <input type="date" id="bincard-end-date" class="form-control" style="padding: 8px 12px; font-size: 13.5px;">
+              <input type="date" id="bincard-end-date" class="form-control"
+                style="padding: 8px 12px; font-size: 13.5px;">
               <button class="btn btn-sm btn-glass" onclick="loadBinCardData()">Filter</button>
               <button class="btn btn-sm btn-cyan" onclick="printBinCardStatement()">
                 🖨️ Print / Export Bin Card
@@ -1890,7 +2001,8 @@
               <span style="color: var(--text-dim);">to</span>
               <input type="date" id="activity-end-date" class="form-control"
                 style="padding: 8px 12px; font-size: 13.5px; width: auto;">
-              <button class="btn btn-sm btn-cyan whitespace-nowrap" onclick="loadActivityLogsData()">Filter Audit Trail</button>
+              <button class="btn btn-sm btn-cyan whitespace-nowrap" onclick="loadActivityLogsData()">Filter Audit
+                Trail</button>
             </div>
           </div>
 
@@ -1922,33 +2034,38 @@
             <div class="glass-panel"
               style="padding: 18px 20px; border-color: rgba(245, 158, 11, 0.5); background: linear-gradient(180deg, rgba(245, 158, 11, 0.12) 0%, rgba(15, 23, 42, 0.8) 100%);">
               <div style="display: flex; align-items: center; justify-content: space-between;">
-                <span style="font-size: 12.5px; color: var(--text-muted); font-weight: 700;">💰 TOTAL OUTSTANDING CREDIT (මුළු අයවිය යුතු ණය)</span>
+                <span style="font-size: 12.5px; color: var(--text-muted); font-weight: 700;">💰 TOTAL OUTSTANDING CREDIT
+                  (මුළු අයවිය යුතු ණය)</span>
               </div>
               <div id="credit-kpi-total-outstanding"
                 style="font-size: clamp(22px, 2vw, 28px); font-weight: 800; color: var(--warning); font-family: var(--font-mono); margin-top: 6px;">
                 Rs. 0.00
               </div>
-              <div style="font-size: 12px; color: var(--text-dim); margin-top: 4px;">Total receivable credit across all customers</div>
+              <div style="font-size: 12px; color: var(--text-dim); margin-top: 4px;">Total receivable credit across all
+                customers</div>
             </div>
 
             <!-- KPI 2: Customers With Active Credit -->
             <div class="glass-panel"
               style="padding: 18px 20px; border-color: rgba(6, 182, 212, 0.45); background: linear-gradient(180deg, rgba(6, 182, 212, 0.1) 0%, rgba(15, 23, 42, 0.8) 100%);">
               <div style="display: flex; align-items: center; justify-content: space-between;">
-                <span style="font-size: 12.5px; color: var(--text-muted); font-weight: 700;">👥 CUSTOMERS WITH ACTIVE CREDIT (ණය ඇති ගනුදෙනුකරුවන්)</span>
+                <span style="font-size: 12.5px; color: var(--text-muted); font-weight: 700;">👥 CUSTOMERS WITH ACTIVE
+                  CREDIT (ණය ඇති ගනුදෙනුකරුවන්)</span>
               </div>
               <div id="credit-kpi-active-customers"
                 style="font-size: clamp(22px, 2vw, 28px); font-weight: 800; color: var(--cyan); font-family: var(--font-mono); margin-top: 6px;">
                 0
               </div>
-              <div id="credit-kpi-total-customers-sub" style="font-size: 12px; color: var(--text-dim); margin-top: 4px;">Out of 0 registered customers</div>
+              <div id="credit-kpi-total-customers-sub"
+                style="font-size: 12px; color: var(--text-dim); margin-top: 4px;">Out of 0 registered customers</div>
             </div>
 
             <!-- KPI 3: Total Credit Collected Today -->
             <div class="glass-panel"
               style="padding: 18px 20px; border-color: rgba(16, 185, 129, 0.45); background: linear-gradient(180deg, rgba(16, 185, 129, 0.12) 0%, rgba(15, 23, 42, 0.8) 100%);">
               <div style="display: flex; align-items: center; justify-content: space-between;">
-                <span style="font-size: 12.5px; color: var(--text-muted); font-weight: 700;">✅ TOTAL CREDIT COLLECTED TODAY (අද දින ලැබුණු ණය ගෙවීම්)</span>
+                <span style="font-size: 12.5px; color: var(--text-muted); font-weight: 700;">✅ TOTAL CREDIT COLLECTED
+                  TODAY (අද දින ලැබුණු ණය ගෙවීම්)</span>
               </div>
               <div id="credit-kpi-collected-today"
                 style="font-size: clamp(22px, 2vw, 28px); font-weight: 800; color: var(--emerald); font-family: var(--font-mono); margin-top: 6px;">
@@ -1964,17 +2081,19 @@
             <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 240px; flex-wrap: wrap;">
               <input type="text" id="credit-customers-search-input" class="form-control"
                 style="max-width: 360px; min-width: 220px; flex: 1;"
-                placeholder="🔍 Search by Customer Mobile Number or Name..."
-                oninput="renderCreditCustomersTable()">
+                placeholder="🔍 Search by Customer Mobile Number or Name..." oninput="renderCreditCustomersTable()">
 
               <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                <button class="btn btn-sm btn-cyan credit-filter-btn" data-filter="all" onclick="selectCreditCustomerFilter('all')">
+                <button class="btn btn-sm btn-cyan credit-filter-btn" data-filter="all"
+                  onclick="selectCreditCustomerFilter('all')">
                   All Customers
                 </button>
-                <button class="btn btn-sm btn-glass credit-filter-btn" data-filter="active" onclick="selectCreditCustomerFilter('active')">
+                <button class="btn btn-sm btn-glass credit-filter-btn" data-filter="active"
+                  onclick="selectCreditCustomerFilter('active')">
                   ⚠️ Has Balance &gt; 0
                 </button>
-                <button class="btn btn-sm btn-glass credit-filter-btn" data-filter="settled" onclick="selectCreditCustomerFilter('settled')">
+                <button class="btn btn-sm btn-glass credit-filter-btn" data-filter="settled"
+                  onclick="selectCreditCustomerFilter('settled')">
                   ✅ Fully Settled
                 </button>
               </div>
@@ -1989,7 +2108,8 @@
           <div class="glass-panel" style="padding: 20px; overflow-x: auto;">
             <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13.5px;">
               <thead>
-                <tr style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted); background: rgba(15, 23, 42, 0.9);">
+                <tr
+                  style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted); background: rgba(15, 23, 42, 0.9);">
                   <th style="padding: 12px; white-space: nowrap;">Customer Name</th>
                   <th style="padding: 12px; white-space: nowrap;">Mobile Number</th>
                   <th style="padding: 12px;">Address</th>
@@ -2491,40 +2611,50 @@
   <div id="modal-invoice-details" class="modal-backdrop">
     <div class="modal-card glass-panel" style="max-width: 680px; border-color: rgba(6, 182, 212, 0.5); padding: 24px;">
       <!-- Modal Header -->
-      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 14px; margin-bottom: 16px;">
+      <div
+        style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 14px; margin-bottom: 16px;">
         <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-          <h3 style="font-size: 18px; font-weight: 800; color: #ffffff; font-family: var(--font-mono);" id="inv-detail-number">INV-0000</h3>
+          <h3 style="font-size: 18px; font-weight: 800; color: #ffffff; font-family: var(--font-mono);"
+            id="inv-detail-number">INV-0000</h3>
           <span id="inv-detail-status" class="badge badge-emerald">PAID</span>
         </div>
         <button class="btn btn-sm btn-glass" onclick="closeInvoiceDetailsModal()">✕</button>
       </div>
 
       <!-- Transaction Metadata Grid -->
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 10px; background: rgba(11, 17, 32, 0.65); border: 1px solid var(--border-glass); border-radius: 12px; padding: 14px; margin-bottom: 16px;">
+      <div
+        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 10px; background: rgba(11, 17, 32, 0.65); border: 1px solid var(--border-glass); border-radius: 12px; padding: 14px; margin-bottom: 16px;">
         <div>
           <div style="font-size: 11px; color: var(--text-dim); font-weight: 700;">DATE & TIME</div>
-          <div id="inv-detail-datetime" style="font-size: 13px; font-weight: 600; color: #ffffff; margin-top: 3px;">-</div>
+          <div id="inv-detail-datetime" style="font-size: 13px; font-weight: 600; color: #ffffff; margin-top: 3px;">-
+          </div>
         </div>
         <div>
           <div style="font-size: 11px; color: var(--text-dim); font-weight: 700;">STAFF MEMBER</div>
-          <div id="inv-detail-staff" style="font-size: 13px; font-weight: 700; color: var(--cyan); margin-top: 3px;">👤 Admin</div>
+          <div id="inv-detail-staff" style="font-size: 13px; font-weight: 700; color: var(--cyan); margin-top: 3px;">👤
+            Admin</div>
         </div>
         <div>
           <div style="font-size: 11px; color: var(--text-dim); font-weight: 700;">PAYMENT METHOD</div>
-          <div id="inv-detail-payment" style="font-size: 13px; font-weight: 700; color: var(--emerald); margin-top: 3px;">Cash</div>
+          <div id="inv-detail-payment"
+            style="font-size: 13px; font-weight: 700; color: var(--emerald); margin-top: 3px;">Cash</div>
         </div>
         <div>
           <div style="font-size: 11px; color: var(--text-dim); font-weight: 700;">ITEMS COUNT</div>
-          <div id="inv-detail-items-count" style="font-size: 13px; font-weight: 700; color: #ffffff; margin-top: 3px;">0 Items</div>
+          <div id="inv-detail-items-count" style="font-size: 13px; font-weight: 700; color: #ffffff; margin-top: 3px;">0
+            Items</div>
         </div>
       </div>
 
       <!-- Purchased Items Breakdown Table -->
-      <div style="font-size: 13px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">🛒 Purchased Items Breakdown</div>
-      <div style="max-height: 240px; overflow-y: auto; border: 1px solid var(--border-glass); border-radius: 10px; margin-bottom: 16px;">
+      <div style="font-size: 13px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">🛒 Purchased Items
+        Breakdown</div>
+      <div
+        style="max-height: 240px; overflow-y: auto; border: 1px solid var(--border-glass); border-radius: 10px; margin-bottom: 16px;">
         <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
           <thead>
-            <tr style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted); background: rgba(15, 23, 42, 0.9); position: sticky; top: 0;">
+            <tr
+              style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted); background: rgba(15, 23, 42, 0.9); position: sticky; top: 0;">
               <th style="padding: 9px 12px;">#</th>
               <th style="padding: 9px 12px;">Product / Barcode</th>
               <th style="padding: 9px 12px; text-align: center;">Qty</th>
@@ -2540,25 +2670,32 @@
       </div>
 
       <!-- Financial Breakdown Box -->
-      <div style="background: rgba(11, 17, 32, 0.75); border: 1px solid var(--border-glass); border-radius: 12px; padding: 14px 18px; margin-bottom: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+      <div
+        style="background: rgba(11, 17, 32, 0.75); border: 1px solid var(--border-glass); border-radius: 12px; padding: 14px 18px; margin-bottom: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
         <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px;">
           <div style="display: flex; justify-content: space-between; color: var(--text-muted);">
             <span>Subtotal:</span>
-            <span id="inv-detail-subtotal" style="font-family: var(--font-mono); color: #ffffff; font-weight: 600;">Rs. 0.00</span>
+            <span id="inv-detail-subtotal" style="font-family: var(--font-mono); color: #ffffff; font-weight: 600;">Rs.
+              0.00</span>
           </div>
           <div style="display: flex; justify-content: space-between; color: var(--text-muted);">
             <span>Discount Given:</span>
-            <span id="inv-detail-discount" style="font-family: var(--font-mono); color: var(--warning); font-weight: 600;">- Rs. 0.00</span>
+            <span id="inv-detail-discount"
+              style="font-family: var(--font-mono); color: var(--warning); font-weight: 600;">- Rs. 0.00</span>
           </div>
           <div style="display: flex; justify-content: space-between; color: var(--text-muted);">
             <span>Estimated Profit:</span>
-            <span id="inv-detail-profit" style="font-family: var(--font-mono); color: var(--cyan); font-weight: 700;">Rs. 0.00</span>
+            <span id="inv-detail-profit"
+              style="font-family: var(--font-mono); color: var(--cyan); font-weight: 700;">Rs. 0.00</span>
           </div>
         </div>
-        <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; border-left: 1px solid var(--border-glass); padding-left: 16px;">
+        <div
+          style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; border-left: 1px solid var(--border-glass); padding-left: 16px;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <span style="font-weight: 700; color: #ffffff;">Grand Total:</span>
-            <span id="inv-detail-grand-total" style="font-family: var(--font-mono); font-size: 18px; font-weight: 800; color: var(--emerald);">Rs. 0.00</span>
+            <span id="inv-detail-grand-total"
+              style="font-family: var(--font-mono); font-size: 18px; font-weight: 800; color: var(--emerald);">Rs.
+              0.00</span>
           </div>
           <div style="display: flex; justify-content: space-between; color: var(--text-muted);">
             <span>Cash Paid:</span>
@@ -2566,7 +2703,8 @@
           </div>
           <div style="display: flex; justify-content: space-between; color: var(--text-muted);">
             <span>Balance / Change:</span>
-            <span id="inv-detail-balance" style="font-family: var(--font-mono); color: var(--emerald); font-weight: 700;">Rs. 0.00</span>
+            <span id="inv-detail-balance"
+              style="font-family: var(--font-mono); color: var(--emerald); font-weight: 700;">Rs. 0.00</span>
           </div>
         </div>
       </div>
@@ -2577,7 +2715,8 @@
           ❌ Void This Bill
         </button>
         <div style="display: flex; gap: 10px; margin-left: auto;">
-          <button class="btn btn-emerald btn-lg" style="padding: 10px 22px; font-size: 14.5px;" onclick="reprintFromDetailsModal()">
+          <button class="btn btn-emerald btn-lg" style="padding: 10px 22px; font-size: 14.5px;"
+            onclick="reprintFromDetailsModal()">
             🖨️ Reprint Receipt
           </button>
           <button class="btn btn-glass" onclick="closeInvoiceDetailsModal()">
@@ -2606,14 +2745,13 @@
         <div class="form-group">
           <label class="form-label">Customer Mobile Number (දුරකථන අංකය) *</label>
           <input type="tel" id="credit-cust-form-phone" class="form-control"
-            style="font-family: var(--font-mono); font-weight: 700; font-size: 15px;"
-            placeholder="e.g. 0771234567" required>
+            style="font-family: var(--font-mono); font-weight: 700; font-size: 15px;" placeholder="e.g. 0771234567"
+            required>
         </div>
 
         <div class="form-group">
           <label class="form-label">Customer Full Name (ගනුදෙනුකරුගේ නම) *</label>
-          <input type="text" id="credit-cust-form-name" class="form-control"
-            placeholder="e.g. Nimal Perera" required>
+          <input type="text" id="credit-cust-form-name" class="form-control" placeholder="e.g. Nimal Perera" required>
         </div>
 
         <div class="form-group">
@@ -2651,12 +2789,14 @@
         style="background: rgba(11, 17, 32, 0.75); border: 1px solid var(--border-glass); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <div>
           <div id="pay-credit-cust-name" style="font-size: 16px; font-weight: 800; color: #ffffff;">Customer Name</div>
-          <div id="pay-credit-cust-phone" style="font-size: 13px; color: var(--cyan); font-family: var(--font-mono);">0771234567</div>
+          <div id="pay-credit-cust-phone" style="font-size: 13px; color: var(--cyan); font-family: var(--font-mono);">
+            0771234567</div>
         </div>
         <div style="text-align: right;">
           <div style="font-size: 11px; color: var(--text-muted); font-weight: 700;">CURRENT OUTSTANDING BALANCE</div>
           <div id="pay-credit-current-balance"
-            style="font-size: 22px; font-weight: 800; color: var(--warning); font-family: var(--font-mono);">Rs. 0.00</div>
+            style="font-size: 22px; font-weight: 800; color: var(--warning); font-family: var(--font-mono);">Rs. 0.00
+          </div>
         </div>
       </div>
 
@@ -2669,16 +2809,18 @@
           </button>
         </div>
         <input type="number" id="pay-credit-amount-input" class="form-control"
-          style="font-size: 18px; font-weight: 800; font-family: var(--font-mono); color: var(--emerald);"
-          min="1" step="any" placeholder="0.00" oninput="updateCreditPaymentPreview()">
+          style="font-size: 18px; font-weight: 800; font-family: var(--font-mono); color: var(--emerald);" min="1"
+          step="any" placeholder="0.00" oninput="updateCreditPaymentPreview()">
       </div>
 
       <!-- Live Remaining Balance Preview -->
       <div
         style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 10px; padding: 10px 14px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
-        <span style="font-size: 13px; font-weight: 700; color: var(--text-main);">Remaining Balance After Payment (ඉතිරි වන ණය ශේෂය):</span>
+        <span style="font-size: 13px; font-weight: 700; color: var(--text-main);">Remaining Balance After Payment (ඉතිරි
+          වන ණය ශේෂය):</span>
         <span id="pay-credit-remaining-preview"
-          style="font-size: 18px; font-weight: 800; font-family: var(--font-mono); color: var(--emerald);">Rs. 0.00</span>
+          style="font-size: 18px; font-weight: 800; font-family: var(--font-mono); color: var(--emerald);">Rs.
+          0.00</span>
       </div>
 
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
@@ -2693,8 +2835,7 @@
 
         <div class="form-group">
           <label class="form-label">Reference Note (Optional)</label>
-          <input type="text" id="pay-credit-note-input" class="form-control"
-            placeholder="e.g. Settled at counter">
+          <input type="text" id="pay-credit-note-input" class="form-control" placeholder="e.g. Settled at counter">
         </div>
       </div>
 
@@ -2719,24 +2860,32 @@
   <!-- ========================================================================= -->
   <div id="modal-credit-history" class="modal-backdrop">
     <div class="modal-card glass-panel" style="max-width: 780px; border-color: rgba(6, 182, 212, 0.55); padding: 24px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 14px; margin-bottom: 16px;">
+      <div
+        style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 14px; margin-bottom: 16px;">
         <div>
-          <h3 style="font-size: 18px; font-weight: 800; color: #ffffff;">📜 Customer Credit History (ගනුදෙනු ඉතිහාසය)</h3>
-          <div id="credit-history-subtitle" style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">Complete chronological ledger of credit bills &amp; repayments</div>
+          <h3 style="font-size: 18px; font-weight: 800; color: #ffffff;">📜 Customer Credit History (ගනුදෙනු ඉතිහාසය)
+          </h3>
+          <div id="credit-history-subtitle" style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">Complete
+            chronological ledger of credit bills &amp; repayments</div>
         </div>
         <button class="btn btn-sm btn-glass" onclick="closeCreditHistoryModal()">✕</button>
       </div>
 
       <!-- Customer Summary Card -->
-      <div style="background: rgba(11, 17, 32, 0.7); border: 1px solid var(--border-glass); border-radius: 12px; padding: 14px 18px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+      <div
+        style="background: rgba(11, 17, 32, 0.7); border: 1px solid var(--border-glass); border-radius: 12px; padding: 14px 18px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
         <div>
-          <div id="credit-history-cust-name" style="font-size: 16px; font-weight: 800; color: #ffffff;">Customer Name</div>
-          <div id="credit-history-cust-meta" style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">Phone • Address</div>
+          <div id="credit-history-cust-name" style="font-size: 16px; font-weight: 800; color: #ffffff;">Customer Name
+          </div>
+          <div id="credit-history-cust-meta" style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">Phone •
+            Address</div>
         </div>
         <div style="display: flex; align-items: center; gap: 14px;">
           <div style="text-align: right;">
             <div style="font-size: 11px; color: var(--text-muted); font-weight: 700;">CURRENT CREDIT BALANCE</div>
-            <div id="credit-history-cust-balance" style="font-size: 22px; font-weight: 800; color: var(--warning); font-family: var(--font-mono);">Rs. 0.00</div>
+            <div id="credit-history-cust-balance"
+              style="font-size: 22px; font-weight: 800; color: var(--warning); font-family: var(--font-mono);">Rs. 0.00
+            </div>
           </div>
           <button type="button" class="btn btn-sm btn-emerald" onclick="openPayCreditFromHistoryModal()">
             💵 Pay Credit
@@ -2748,10 +2897,12 @@
       </div>
 
       <!-- Chronological Ledger Table -->
-      <div style="max-height: 400px; overflow-y: auto; overflow-x: auto; border: 1px solid var(--border-glass); border-radius: 10px;">
+      <div
+        style="max-height: 400px; overflow-y: auto; overflow-x: auto; border: 1px solid var(--border-glass); border-radius: 10px;">
         <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
           <thead>
-            <tr style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted); background: #0f172a; position: sticky; top: 0;">
+            <tr
+              style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted); background: #0f172a; position: sticky; top: 0;">
               <th style="padding: 10px 12px; white-space: nowrap;">Date &amp; Time</th>
               <th style="padding: 10px 12px; white-space: nowrap;">Transaction Type</th>
               <th style="padding: 10px 12px;">Reference / Invoice Note</th>
@@ -2842,7 +2993,8 @@
           • Use quick cash tender buttons (<code>+500</code>, <code>+1,000</code>, <code>+5,000</code>,
           <code>Exact</code>) to instantly calculate Change Due (ඉතුරු මුදල).<br>
           • Complete sale triggers thermal receipt print (80mm / 58mm) and deducts inventory in real time across all
-          counters.</p>
+          counters.
+        </p>
 
         <h4 style="color: var(--emerald); font-size: 16px; margin: 16px 0 6px 0;">4. Real-Time Multi-Device Sync</h4>
         <p>• Connected via WebSockets. When Cashier 1 makes a sale or adjusts stock, Counter 2 and Counter 3
@@ -2879,7 +3031,8 @@
   <div id="printable-receipt-container"></div>
 
   <!-- Main POS Client-Side Controller -->
-  <script src="/assets/pos.js?v=20261104_live2"></script>
+  <script src="/assets/pos.js?v=20261106_smtp"></script>
+  <script src="/assets/pos.js?v=20261115_supabase_online"></script>
 </body>
 
 </html>
