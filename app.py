@@ -12,6 +12,7 @@ import logging
 import smtplib
 import hashlib
 import ssl
+import socket
 import urllib.parse
 import threading
 from datetime import datetime, timedelta, timezone
@@ -64,17 +65,20 @@ SMTP_EMAIL = SMTP_FROM_EMAIL
 def send_smtp_email_detailed(to_email: str, subject: str, html_content: str, plain_text: str = ""):
     """
     Sends a real HTML email via Zoho Mail SMTP relay from PrasaTek System Solutions <info@prasatek.lk>.
-    1. Reloads .env with override=True on EVERY call so credential updates take effect immediately.
-    2. Automatically cascades across Zoho hosts and ports:
-       - Configured port (e.g. 465 SSL or 587 STARTTLS) on configured host (e.g. smtppro.zoho.com)
-       - If smtppro.zoho.com returns 554 Access Restricted (non-pro tier), seamlessly falls back to smtp.zoho.com
-       - Fallback to alternative port (465 SSL <-> 587 STARTTLS)
-    3. Returns (success: bool, error_detail: str).
+    Specifically optimized for cloud hosting (Render):
+    1. Sets a robust 30-second timeout (configurable via SMTP_TIMEOUT) to prevent premature dropouts.
+    2. Multi-port & multi-host automatic fallback:
+       - Configured port (e.g. 587 STARTTLS or 465 SSL) on configured host (smtp.zoho.com / smtppro.zoho.com)
+       - If port 465 hangs or times out due to cloud egress filters, falls back to port 587 with STARTTLS (and vice versa)
+       - Automatically tries both smtp.zoho.com and smtppro.zoho.com
+    3. Outputs detailed diagnostic logging to the Render console to inspect handshake and network response.
+    4. Returns (success: bool, error_detail: str).
     """
     load_dotenv(dotenv_path=ENV_FILE_PATH, override=True)
 
-    smtp_host = os.getenv("SMTP_HOST", "smtppro.zoho.com").strip()
+    smtp_host = os.getenv("SMTP_HOST", "smtp.zoho.com").strip()
     smtp_port = int(os.getenv("SMTP_PORT", "465").strip())
+    smtp_timeout = int(os.getenv("SMTP_TIMEOUT", "30").strip())
     smtp_login = os.getenv("SMTP_LOGIN", os.getenv("SMTP_EMAIL", "info@prasatek.lk")).strip()
     smtp_password = os.getenv("SMTP_PASSWORD", "").strip()
     smtp_from_email = os.getenv("SMTP_FROM_EMAIL", "info@prasatek.lk").strip()
@@ -82,7 +86,7 @@ def send_smtp_email_detailed(to_email: str, subject: str, html_content: str, pla
 
     if not smtp_login or not smtp_password:
         err_msg = "Missing SMTP_LOGIN or SMTP_PASSWORD in .env"
-        logger.error(f"[SMTP ERROR] {err_msg}")
+        logger.error(f"[RENDER SMTP ERROR] {err_msg}")
         return False, err_msg
 
     msg = MIMEMultipart("alternative")
@@ -96,7 +100,7 @@ def send_smtp_email_detailed(to_email: str, subject: str, html_content: str, pla
     msg.attach(MIMEText(html_content, "html", "utf-8"))
     raw_message = msg.as_string()
 
-    # Build server attempts: primary host + port first, then alternative port, then alternative Zoho host
+    # Build server attempts: primary host + port first, then alternate port, then alternative Zoho host
     hosts = [smtp_host]
     if "zoho" in smtp_host.lower():
         alt_host = "smtp.zoho.com" if "smtppro" in smtp_host.lower() else "smtppro.zoho.com"
@@ -108,7 +112,7 @@ def send_smtp_email_detailed(to_email: str, subject: str, html_content: str, pla
     elif smtp_port == 587:
         ports = [(587, "STARTTLS"), (465, "SMTP_SSL")]
     else:
-        ports = [(smtp_port, "SMTP_SSL" if smtp_port == 465 else "STARTTLS"), (465, "SMTP_SSL"), (587, "STARTTLS")]
+        ports = [(smtp_port, "SMTP_SSL" if smtp_port == 465 else "STARTTLS"), (587, "STARTTLS"), (465, "SMTP_SSL")]
 
     server_attempts = []
     for h in hosts:
@@ -116,31 +120,42 @@ def send_smtp_email_detailed(to_email: str, subject: str, html_content: str, pla
             if (h, p, m) not in server_attempts:
                 server_attempts.append((h, p, m))
 
+    logger.info(
+        f"[RENDER SMTP DISPATCH] Preparing email to '{to_email}' | Subject: '{subject}' | "
+        f"Configured: {smtp_host}:{smtp_port} | Timeout: {smtp_timeout}s | Routes planned: {len(server_attempts)}"
+    )
+
     attempt_errors = []
 
     for idx, (host, port, mode) in enumerate(server_attempts, start=1):
         try:
             logger.info(
-                f"[SMTP] Attempt {idx}/{len(server_attempts)}: Connecting to {host}:{port} ({mode}) as '{smtp_login}' -> '{to_email}'"
+                f"[RENDER SMTP DIAGNOSTIC] Attempt {idx}/{len(server_attempts)}: "
+                f"Connecting to {host}:{port} ({mode}, timeout={smtp_timeout}s) as '{smtp_login}' -> '{to_email}'..."
             )
             if mode == "SMTP_SSL":
                 context = ssl.create_default_context()
-                with smtplib.SMTP_SSL(host, port, timeout=10, context=context) as server:
-                    server.ehlo()
+                with smtplib.SMTP_SSL(host, port, timeout=smtp_timeout, context=context) as server:
+                    ehlo_code, _ = server.ehlo()
+                    logger.info(f"[RENDER SMTP DIAGNOSTIC] Connected (SSL) to {host}:{port}. EHLO status: {ehlo_code}")
                     server.login(smtp_login, smtp_password)
+                    logger.info(f"[RENDER SMTP DIAGNOSTIC] Login authenticated as '{smtp_login}' on {host}:{port}")
                     server.sendmail(smtp_from_email, [to_email], raw_message)
             else:
                 context = ssl.create_default_context()
-                with smtplib.SMTP(host, port, timeout=10) as server:
-                    server.ehlo()
-                    server.starttls(context=context)
+                with smtplib.SMTP(host, port, timeout=smtp_timeout) as server:
+                    ehlo_code, _ = server.ehlo()
+                    logger.info(f"[RENDER SMTP DIAGNOSTIC] Connected to {host}:{port}. EHLO status: {ehlo_code}")
+                    tls_code, _ = server.starttls(context=context)
+                    logger.info(f"[RENDER SMTP DIAGNOSTIC] STARTTLS negotiated ({tls_code}) on {host}:{port}")
                     server.ehlo()
                     server.login(smtp_login, smtp_password)
+                    logger.info(f"[RENDER SMTP DIAGNOSTIC] Login authenticated as '{smtp_login}' on {host}:{port}")
                     server.sendmail(smtp_from_email, [to_email], raw_message)
 
             logger.info(
-                f"[SMTP SUCCESS] Email delivered to {to_email} from '{smtp_from_name} <{smtp_from_email}>' "
-                f"via {host}:{port} ({mode}) on Attempt {idx}!"
+                f"[RENDER SMTP SUCCESS] Email successfully delivered to '{to_email}' "
+                f"from '{smtp_from_name} <{smtp_from_email}>' via {host}:{port} ({mode}) on attempt {idx}!"
             )
             return True, ""
 
@@ -149,22 +164,77 @@ def send_smtp_email_detailed(to_email: str, subject: str, html_content: str, pla
             err_raw = getattr(auth_err, "smtp_error", b"")
             err_text = err_raw.decode("utf-8", errors="replace") if isinstance(err_raw, bytes) else str(err_raw)
             detail = f"{host}:{port} ({mode}) Auth Error ({err_code}): {err_text}"
-            logger.error(f"[SMTP ERROR] Attempt {idx}/{len(server_attempts)} failed for {to_email} — {detail}")
+            logger.error(f"[RENDER SMTP AUTH ERROR] Attempt {idx}/{len(server_attempts)} failed for {to_email} — {detail}")
+            attempt_errors.append(detail)
+        except (TimeoutError, socket.timeout) as time_err:
+            detail = f"{host}:{port} ({mode}) Timed Out after {smtp_timeout}s: {time_err or 'No response from server'}"
+            logger.warning(
+                f"[RENDER SMTP TIMEOUT] Attempt {idx}/{len(server_attempts)}: {detail}. "
+                f"(Render cloud egress latency or port restriction. Switching to alternative route...)"
+            )
+            attempt_errors.append(detail)
+        except smtplib.SMTPConnectError as conn_err:
+            detail = f"{host}:{port} ({mode}) Connection Error: {conn_err}"
+            logger.warning(f"[RENDER SMTP CONNECT ERROR] Attempt {idx}/{len(server_attempts)}: {detail}")
             attempt_errors.append(detail)
         except Exception as e:
             detail = f"{host}:{port} ({mode}): {type(e).__name__}: {e}"
-            logger.error(f"[SMTP ERROR] Attempt {idx}/{len(server_attempts)} failed for {to_email} — {detail}")
+            logger.error(f"[RENDER SMTP ERROR] Attempt {idx}/{len(server_attempts)} failed for {to_email} — {detail}")
             attempt_errors.append(detail)
 
     combined_error = " | ".join(attempt_errors)
-    logger.error(f"[SMTP ERROR] All {len(server_attempts)} server attempts failed sending to {to_email}: {combined_error}")
+    logger.error(
+        f"[RENDER SMTP CRITICAL] All {len(server_attempts)} server attempts failed sending to {to_email}: {combined_error}"
+    )
     return False, combined_error
 
 
-def send_smtp_email(to_email: str, subject: str, html_content: str, plain_text: str = "") -> bool:
-    """Wrapper returning bool for callers that only check True/False."""
+def send_email_in_background(
+    to_email: str,
+    subject: str,
+    html_content: str,
+    plain_text: str = "",
+    context_label: str = "Email"
+) -> threading.Thread:
+    """
+    Fires send_smtp_email_detailed in a detached background daemon thread.
+    Returns immediately so the HTTP request finishes in milliseconds and never times out on Render.
+    Logs all diagnostic results to the console.
+    """
+    def _worker():
+        logger.info(f"[{context_label}] [BG-THREAD STARTED] Sending to '{to_email}'...")
+        ok, err = send_smtp_email_detailed(to_email, subject, html_content, plain_text)
+        if ok:
+            logger.info(f"[{context_label}] [BG-THREAD SUCCESS] Email to '{to_email}' completed successfully.")
+        else:
+            logger.error(f"[{context_label}] [BG-THREAD FAILED] Email to '{to_email}' failed: {err}")
+
+    thread = threading.Thread(target=_worker, daemon=True, name=f"SMTP-{to_email}")
+    thread.start()
+    return thread
+
+
+def send_smtp_email(to_email: str, subject: str, html_content: str, plain_text: str = "", background: bool = False) -> bool:
+    """
+    Wrapper for sending SMTP email.
+    If background=True, starts a background daemon thread and returns True immediately.
+    If background=False, runs synchronously and returns True/False.
+    """
+    if background:
+        send_email_in_background(to_email, subject, html_content, plain_text)
+        return True
     ok, _ = send_smtp_email_detailed(to_email, subject, html_content, plain_text)
     return ok
+
+
+def send_email(to_email: str, subject: str, html_content: str, plain_text: str = "", background: bool = True):
+    """
+    Standard email dispatcher. Defaults to non-blocking background thread (background=True)
+    for cloud responsiveness. Set background=False to wait for synchronous response.
+    """
+    if background:
+        return send_email_in_background(to_email, subject, html_content, plain_text)
+    return send_smtp_email(to_email, subject, html_content, plain_text, background=False)
 
 # ---------------------------------------------------------------------------
 # Supabase Cloud Database Engine (via database.py)
@@ -1007,22 +1077,15 @@ def send_otp(req: SendOTPRequest, db: Session = Depends(get_db)):
         f"Smart POS & Enterprise Software Solutions — Sri Lanka\n"
     )
 
-    # Fire-and-forget: send the email in a background thread so the API
-    # responds instantly (<50ms) and never times out on Render / cloud hosting.
-    def _bg_send():
-        try:
-            ok, err = send_smtp_email_detailed(
-                to_email=email_clean,
-                subject=f"Your SupiriPOS PRO Verification Code: {otp}",
-                html_content=html_content,
-                plain_text=plain_text
-            )
-            if not ok:
-                logger.error(f"[OTP BG-SMTP ERROR] Failed sending OTP to {email_clean}: {err}")
-        except Exception as bg_err:
-            logger.error(f"[OTP BG-SMTP EXCEPTION] {bg_err}")
-
-    threading.Thread(target=_bg_send, daemon=True).start()
+    # Non-blocking: fire the email in a background daemon thread so the API
+    # responds instantly (<30ms) and never times out on Render cloud hosting.
+    send_email_in_background(
+        to_email=email_clean,
+        subject=f"Your SupiriPOS PRO Verification Code: {otp}",
+        html_content=html_content,
+        plain_text=plain_text,
+        context_label="OTP-VERIFY"
+    )
 
     return {
         "success": True,
@@ -1203,14 +1266,16 @@ def register_business(req: RegisterBusinessRequest, db: Session = Depends(get_db
     )
 
     try:
-        send_smtp_email(
+        # Non-blocking: send welcome email in background daemon thread
+        send_email_in_background(
             to_email=email_clean,
             subject=f"🎉 Congratulations! Your SupiriPOS PRO Account is Ready",
             html_content=welcome_html,
-            plain_text=welcome_plain
+            plain_text=welcome_plain,
+            context_label="WELCOME-CREDENTIALS"
         )
     except Exception as email_err:
-        logger.warning(f"[WELCOME EMAIL ERROR] Could not send welcome email to {email_clean}: {email_err}")
+        logger.warning(f"[WELCOME EMAIL ERROR] Could not dispatch welcome email to {email_clean}: {email_err}")
 
     logger.info(f"[REGISTER] New Business registered: {business_code} ({req.shop_name})")
 
