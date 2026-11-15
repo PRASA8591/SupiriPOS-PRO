@@ -9,16 +9,11 @@ import sys
 import json
 import random
 import logging
-import smtplib
 import hashlib
-import ssl
-import socket
 import urllib.parse
 import threading
 import requests
 from datetime import datetime, timedelta, timezone
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from typing import List, Dict, Optional, Any
 
 from fastapi import (
@@ -55,300 +50,69 @@ DATABASE_URL = os.getenv("DATABASE_URL", "")
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "8000"))
 SECRET_KEY = os.getenv("SECRET_KEY", "supiripos-prasatek-secret-key-2026")
-SMTP_HOST = os.getenv("SMTP_HOST", "smtppro.zoho.com").strip()
-SMTP_PORT = int(os.getenv("SMTP_PORT", "465").strip())
-SMTP_LOGIN = os.getenv("SMTP_LOGIN", os.getenv("SMTP_EMAIL", "info@prasatek.lk")).strip()
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "").strip()
-SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", "info@prasatek.lk").strip()
-SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "PrasaTek System Solutions").strip()
-SMTP_EMAIL = SMTP_FROM_EMAIL
+# Resend HTTPS REST API Configuration (Port 443 HTTPS - 100% cloud-native)
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
+RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "PrasaTek System Solutions <noreply@prasatek.lk>").strip()
 
-def send_http_rest_email(to_email: str, subject: str, html_content: str, plain_text: str = "") -> tuple[bool, str]:
+if not RESEND_API_KEY:
+    logger.warning("[RESEND CONFIG] RESEND_API_KEY is not set in environment or .env. Please configure RESEND_API_KEY for email delivery.")
+
+
+def send_resend_email_detailed(to_email: str, subject: str, html_content: str, plain_text: str = "") -> tuple[bool, str]:
     """
-    Sends an email using HTTPS REST API (Port 443) via Python requests.
-    100% cloud-safe: completely bypasses raw SMTP ports (25, 465, 587) restricted on Render.
-    Supports:
-    1. Zoho Mail Official REST API (via ZOHO_OAUTH_TOKEN / ZOHO_API_KEY / ZOHO_ACCESS_TOKEN)
-    2. Zoho ZeptoMail REST API (via ZEPTOMAIL_API_KEY / ZOHO_ZEPTO_KEY / ZOHO_MAIL_TOKEN)
-    3. Brevo Transactional HTTPS REST API (via BREVO_API_KEY / SIB_API_KEY)
-    4. Resend Transactional HTTPS REST API (via RESEND_API_KEY)
+    Sends an email using the Resend HTTPS REST API (https://api.resend.com/emails).
+    Uses standard HTTPS Port 443 with Bearer token authentication.
+    100% cloud-safe: completely eliminates SMTP timeouts, port restrictions, and handshake latency.
     """
     load_dotenv(dotenv_path=ENV_FILE_PATH, override=True)
-    smtp_from_email = os.getenv("SMTP_FROM_EMAIL", "info@prasatek.lk").strip()
-    smtp_from_name = os.getenv("SMTP_FROM_NAME", "PrasaTek System Solutions").strip()
+    api_key = os.getenv("RESEND_API_KEY", RESEND_API_KEY).strip()
+    from_email = os.getenv("RESEND_FROM_EMAIL", RESEND_FROM_EMAIL).strip()
 
-    # --- Channel 1: Zoho Mail Official REST API (Port 443 HTTPS) ---
-    zoho_oauth_token = (
-        os.getenv("ZOHO_OAUTH_TOKEN", "") or
-        os.getenv("ZOHO_API_KEY", "") or
-        os.getenv("ZOHO_ACCESS_TOKEN", "")
-    ).strip()
-    zoho_account_id = os.getenv("ZOHO_ACCOUNT_ID", "").strip()
-
-    if zoho_oauth_token:
-        try:
-            logger.info(f"[RENDER HTTP API] Attempting send to '{to_email}' via Zoho Mail REST API...")
-            if not zoho_account_id:
-                acc_res = requests.get(
-                    "https://mail.zoho.com/api/accounts",
-                    headers={"Authorization": f"Zoho-oauthtoken {zoho_oauth_token}"},
-                    timeout=10
-                )
-                if acc_res.status_code == 200:
-                    data = acc_res.json()
-                    accounts = data.get("data", [])
-                    if accounts:
-                        zoho_account_id = str(accounts[0].get("accountId", ""))
-
-            target_url = (
-                f"https://mail.zoho.com/api/accounts/{zoho_account_id}/messages"
-                if zoho_account_id else
-                "https://mail.zoho.com/api/accounts/messages"
-            )
-            payload = {
-                "fromAddress": smtp_from_email,
-                "toAddress": to_email,
-                "subject": subject,
-                "content": html_content,
-                "mailFormat": "html"
-            }
-            headers = {
-                "Authorization": f"Zoho-oauthtoken {zoho_oauth_token}",
-                "Content-Type": "application/json"
-            }
-            res = requests.post(target_url, json=payload, headers=headers, timeout=15)
-            if res.status_code in [200, 201]:
-                logger.info(f"[RENDER HTTP SUCCESS] Delivered to '{to_email}' via Zoho Mail REST API ({res.status_code})!")
-                return True, ""
-            else:
-                logger.warning(f"[RENDER HTTP WARN] Zoho Mail REST API returned {res.status_code}: {res.text[:200]}")
-        except Exception as zoho_api_err:
-            logger.warning(f"[RENDER HTTP ERROR] Zoho Mail REST API exception: {zoho_api_err}")
-
-    # --- Channel 2: Zoho ZeptoMail REST API (Port 443 HTTPS) ---
-    zeptomail_token = (
-        os.getenv("ZEPTOMAIL_API_KEY", "") or
-        os.getenv("ZOHO_ZEPTO_KEY", "") or
-        os.getenv("ZOHO_MAIL_TOKEN", "")
-    ).strip()
-    if zeptomail_token:
-        try:
-            logger.info(f"[RENDER HTTP API] Attempting send to '{to_email}' via Zoho ZeptoMail HTTPS API...")
-            url = "https://api.zeptomail.com/v2.1/email"
-            payload = {
-                "from": {"address": smtp_from_email, "name": smtp_from_name},
-                "to": [{"email_address": {"address": to_email}}],
-                "subject": subject,
-                "htmlbody": html_content
-            }
-            headers = {
-                "Authorization": f"Zoho-enczapikey {zeptomail_token}",
-                "Content-Type": "application/json"
-            }
-            res = requests.post(url, json=payload, headers=headers, timeout=15)
-            if res.status_code in [200, 201]:
-                logger.info(f"[RENDER HTTP SUCCESS] Delivered to '{to_email}' via Zoho ZeptoMail REST API ({res.status_code})!")
-                return True, ""
-            else:
-                logger.warning(f"[RENDER HTTP WARN] ZeptoMail returned {res.status_code}: {res.text[:200]}")
-        except Exception as zepto_err:
-            logger.warning(f"[RENDER HTTP ERROR] ZeptoMail exception: {zepto_err}")
-
-    # --- Channel 3: Brevo Transactional HTTPS REST API (Port 443) ---
-    brevo_api_key = os.getenv("BREVO_API_KEY", os.getenv("SIB_API_KEY", "")).strip()
-    if brevo_api_key:
-        try:
-            logger.info(f"[RENDER HTTP API] Attempting send to '{to_email}' via Brevo HTTPS REST API...")
-            url = "https://api.brevo.com/v3/smtp/email"
-            payload = {
-                "sender": {"name": smtp_from_name, "email": smtp_from_email},
-                "to": [{"email": to_email}],
-                "subject": subject,
-                "htmlContent": html_content
-            }
-            headers = {
-                "api-key": brevo_api_key,
-                "Content-Type": "application/json"
-            }
-            res = requests.post(url, json=payload, headers=headers, timeout=15)
-            if res.status_code in [200, 201]:
-                logger.info(f"[RENDER HTTP SUCCESS] Delivered to '{to_email}' via Brevo HTTPS REST API ({res.status_code})!")
-                return True, ""
-            else:
-                logger.warning(f"[RENDER HTTP WARN] Brevo REST API returned {res.status_code}: {res.text[:200]}")
-        except Exception as brevo_err:
-            logger.warning(f"[RENDER HTTP ERROR] Brevo REST API exception: {brevo_err}")
-
-    # --- Channel 4: Resend Transactional HTTPS REST API (Port 443) ---
-    resend_key = os.getenv("RESEND_API_KEY", "").strip()
-    if resend_key:
-        try:
-            logger.info(f"[RENDER HTTP API] Attempting send to '{to_email}' via Resend HTTPS REST API...")
-            url = "https://api.resend.com/emails"
-            payload = {
-                "from": f"{smtp_from_name} <{smtp_from_email}>",
-                "to": [to_email],
-                "subject": subject,
-                "html": html_content
-            }
-            headers = {
-                "Authorization": f"Bearer {resend_key}",
-                "Content-Type": "application/json"
-            }
-            res = requests.post(url, json=payload, headers=headers, timeout=15)
-            if res.status_code in [200, 201]:
-                logger.info(f"[RENDER HTTP SUCCESS] Delivered to '{to_email}' via Resend HTTPS REST API ({res.status_code})!")
-                return True, ""
-            else:
-                logger.warning(f"[RENDER HTTP WARN] Resend REST API returned {res.status_code}: {res.text[:200]}")
-        except Exception as resend_err:
-            logger.warning(f"[RENDER HTTP ERROR] Resend REST API exception: {resend_err}")
-
-    return False, "No cloud HTTP REST API token configured"
-
-
-def send_smtp_email_detailed(to_email: str, subject: str, html_content: str, plain_text: str = ""):
-    """
-    Sends a real HTML email via Zoho Mail SMTP relay from PrasaTek System Solutions <info@prasatek.lk>.
-    Specifically optimized for cloud hosting (Render):
-    1. Sets a robust 30-second timeout (configurable via SMTP_TIMEOUT) to prevent premature dropouts.
-    2. Multi-port & multi-host automatic fallback:
-       - Configured port (e.g. 587 STARTTLS or 465 SSL) on configured host (smtp.zoho.com / smtppro.zoho.com)
-       - If port 465 hangs or times out due to cloud egress filters, falls back to port 587 with STARTTLS (and vice versa)
-       - Automatically tries both smtp.zoho.com and smtppro.zoho.com
-    3. Outputs detailed diagnostic logging to the Render console to inspect handshake and network response.
-    4. Returns (success: bool, error_detail: str).
-    """
-    load_dotenv(dotenv_path=ENV_FILE_PATH, override=True)
-
-    smtp_host = os.getenv("SMTP_HOST", "smtp.zoho.com").strip()
-    smtp_port = int(os.getenv("SMTP_PORT", "465").strip())
-    smtp_timeout = int(os.getenv("SMTP_TIMEOUT", "30").strip())
-    smtp_login = os.getenv("SMTP_LOGIN", os.getenv("SMTP_EMAIL", "info@prasatek.lk")).strip()
-    smtp_password = os.getenv("SMTP_PASSWORD", "").strip()
-    smtp_from_email = os.getenv("SMTP_FROM_EMAIL", "info@prasatek.lk").strip()
-    smtp_from_name = os.getenv("SMTP_FROM_NAME", "PrasaTek System Solutions").strip()
-
-    if not smtp_login or not smtp_password:
-        err_msg = "Missing SMTP_LOGIN or SMTP_PASSWORD in .env"
-        logger.error(f"[RENDER SMTP ERROR] {err_msg}")
+    if not api_key:
+        err_msg = "Missing RESEND_API_KEY in environment (.env)"
+        logger.error(f"[RESEND ERROR] {err_msg}")
         return False, err_msg
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = f"{smtp_from_name} <{smtp_from_email}>"
-    msg["To"] = to_email
-    msg["Reply-To"] = smtp_from_email
-
+    url = "https://api.resend.com/emails"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "from": from_email,
+        "to": [to_email],
+        "subject": subject,
+        "html": html_content
+    }
     if plain_text:
-        msg.attach(MIMEText(plain_text, "plain", "utf-8"))
-    msg.attach(MIMEText(html_content, "html", "utf-8"))
-    raw_message = msg.as_string()
-
-    # Build server attempts: primary host + port first, then alternate port, then alternative Zoho host
-    hosts = [smtp_host]
-    if "zoho" in smtp_host.lower():
-        alt_host = "smtp.zoho.com" if "smtppro" in smtp_host.lower() else "smtppro.zoho.com"
-        if alt_host not in hosts:
-            hosts.append(alt_host)
-
-    if smtp_port == 465:
-        ports = [(465, "SMTP_SSL"), (587, "STARTTLS")]
-    elif smtp_port == 587:
-        ports = [(587, "STARTTLS"), (465, "SMTP_SSL")]
-    else:
-        ports = [(smtp_port, "SMTP_SSL" if smtp_port == 465 else "STARTTLS"), (587, "STARTTLS"), (465, "SMTP_SSL")]
-
-    server_attempts = []
-    for h in hosts:
-        for p, m in ports:
-            if (h, p, m) not in server_attempts:
-                server_attempts.append((h, p, m))
+        payload["text"] = plain_text
 
     logger.info(
-        f"[RENDER SMTP DISPATCH] Preparing email to '{to_email}' | Subject: '{subject}' | "
-        f"Configured: {smtp_host}:{smtp_port} | Timeout: {smtp_timeout}s | Routes planned: {len(server_attempts)}"
+        f"[RESEND DISPATCH] Sending email to '{to_email}' from '{from_email}' | Subject: '{subject}'"
     )
 
-    attempt_errors = []
-
-    for idx, (host, port, mode) in enumerate(server_attempts, start=1):
-        try:
+    try:
+        res = requests.post(url, json=payload, headers=headers, timeout=20)
+        if res.status_code in (200, 201):
+            res_data = res.json() if res.text else {}
+            email_id = res_data.get("id", "ok")
             logger.info(
-                f"[RENDER SMTP DIAGNOSTIC] Attempt {idx}/{len(server_attempts)}: "
-                f"Connecting to {host}:{port} ({mode}, timeout={smtp_timeout}s) as '{smtp_login}' -> '{to_email}'..."
-            )
-            if mode == "SMTP_SSL":
-                context = ssl.create_default_context()
-                with smtplib.SMTP_SSL(host, port, timeout=smtp_timeout, context=context) as server:
-                    ehlo_code, _ = server.ehlo()
-                    logger.info(f"[RENDER SMTP DIAGNOSTIC] Connected (SSL) to {host}:{port}. EHLO status: {ehlo_code}")
-                    server.login(smtp_login, smtp_password)
-                    logger.info(f"[RENDER SMTP DIAGNOSTIC] Login authenticated as '{smtp_login}' on {host}:{port}")
-                    server.sendmail(smtp_from_email, [to_email], raw_message)
-            else:
-                context = ssl.create_default_context()
-                with smtplib.SMTP(host, port, timeout=smtp_timeout) as server:
-                    ehlo_code, _ = server.ehlo()
-                    logger.info(f"[RENDER SMTP DIAGNOSTIC] Connected to {host}:{port}. EHLO status: {ehlo_code}")
-                    tls_code, _ = server.starttls(context=context)
-                    logger.info(f"[RENDER SMTP DIAGNOSTIC] STARTTLS negotiated ({tls_code}) on {host}:{port}")
-                    server.ehlo()
-                    server.login(smtp_login, smtp_password)
-                    logger.info(f"[RENDER SMTP DIAGNOSTIC] Login authenticated as '{smtp_login}' on {host}:{port}")
-                    server.sendmail(smtp_from_email, [to_email], raw_message)
-
-            logger.info(
-                f"[RENDER SMTP SUCCESS] Email successfully delivered to '{to_email}' "
-                f"from '{smtp_from_name} <{smtp_from_email}>' via {host}:{port} ({mode}) on attempt {idx}!"
+                f"[RESEND SUCCESS] Email successfully delivered to '{to_email}' via Resend API (ID: {email_id})!"
             )
             return True, ""
-
-        except smtplib.SMTPAuthenticationError as auth_err:
-            err_code = getattr(auth_err, "smtp_code", 535)
-            err_raw = getattr(auth_err, "smtp_error", b"")
-            err_text = err_raw.decode("utf-8", errors="replace") if isinstance(err_raw, bytes) else str(err_raw)
-            detail = f"{host}:{port} ({mode}) Auth Error ({err_code}): {err_text}"
-            logger.error(f"[RENDER SMTP AUTH ERROR] Attempt {idx}/{len(server_attempts)} failed for {to_email} — {detail}")
-            attempt_errors.append(detail)
-        except (TimeoutError, socket.timeout) as time_err:
-            detail = f"{host}:{port} ({mode}) Timed Out after {smtp_timeout}s: {time_err or 'No response from server'}"
-            logger.warning(
-                f"[RENDER SMTP TIMEOUT] Attempt {idx}/{len(server_attempts)}: {detail}. "
-                f"(Render cloud egress latency or port restriction. Switching to alternative route...)"
-            )
-            attempt_errors.append(detail)
-        except smtplib.SMTPConnectError as conn_err:
-            detail = f"{host}:{port} ({mode}) Connection Error: {conn_err}"
-            logger.warning(f"[RENDER SMTP CONNECT ERROR] Attempt {idx}/{len(server_attempts)}: {detail}")
-            attempt_errors.append(detail)
-        except Exception as e:
-            detail = f"{host}:{port} ({mode}): {type(e).__name__}: {e}"
-            logger.error(f"[RENDER SMTP ERROR] Attempt {idx}/{len(server_attempts)} failed for {to_email} — {detail}")
-            attempt_errors.append(detail)
-
-    combined_error = " | ".join(attempt_errors)
-    logger.error(
-        f"[RENDER SMTP CRITICAL] All {len(server_attempts)} server attempts failed sending to {to_email}: {combined_error}"
-    )
-    return False, combined_error
+        else:
+            err_detail = f"Resend API error ({res.status_code}): {res.text}"
+            logger.error(f"[RESEND ERROR] Failed sending to '{to_email}' — {err_detail}")
+            return False, err_detail
+    except Exception as e:
+        err_detail = f"Resend request exception: {type(e).__name__}: {e}"
+        logger.error(f"[RESEND EXCEPTION] Failed sending to '{to_email}' — {err_detail}")
+        return False, err_detail
 
 
 def send_email_detailed(to_email: str, subject: str, html_content: str, plain_text: str = "") -> tuple[bool, str]:
-    """
-    Unified multi-channel email sender for SupiriPOS PRO.
-    Channel 1: Cloud HTTPS REST API (Port 443 - 100% cloud-safe, immune to SMTP port blocks on Render).
-    Channel 2: Zoho Mail SMTP Relay with STARTTLS (Port 587) & SSL (Port 465) with 30s timeout as resilient fallback.
-    Returns: (success: bool, error_detail: str)
-    """
-    # 1. First attempt Cloud HTTPS REST API (Port 443)
-    http_ok, http_err = send_http_rest_email(to_email, subject, html_content, plain_text)
-    if http_ok:
-        return True, ""
-
-    # 2. Fall back to resilient Zoho Mail SMTP Relay (Ports 587 STARTTLS / 465 SSL, 30s timeout)
-    logger.info(f"[RENDER DISPATCH] HTTP REST API skipped or unavailable; switching to Zoho SMTP Relay with multi-port TLS fallback...")
-    return send_smtp_email_detailed(to_email, subject, html_content, plain_text)
+    """Unified email dispatcher routing directly to Resend HTTPS REST API."""
+    return send_resend_email_detailed(to_email, subject, html_content, plain_text)
 
 
 def send_email_in_background(
@@ -359,13 +123,13 @@ def send_email_in_background(
     context_label: str = "Email"
 ) -> threading.Thread:
     """
-    Fires send_email_detailed in a detached background daemon thread.
-    Returns immediately (<2ms) so the FastAPI endpoint never waits for network transmission.
-    Logs all diagnostic results to the Render console.
+    Fires Resend email delivery in a detached background daemon thread.
+    Returns immediately (<2ms) so FastAPI endpoints respond instantly without waiting for network transmission.
+    Logs all diagnostic results to the console.
     """
     def _worker():
         logger.info(f"[{context_label}] [BG-THREAD STARTED] Sending email to '{to_email}'...")
-        ok, err = send_email_detailed(to_email, subject, html_content, plain_text)
+        ok, err = send_resend_email_detailed(to_email, subject, html_content, plain_text)
         if ok:
             logger.info(f"[{context_label}] [BG-THREAD SUCCESS] Email to '{to_email}' delivered successfully.")
         else:
@@ -377,23 +141,16 @@ def send_email_in_background(
 
 
 def send_smtp_email(to_email: str, subject: str, html_content: str, plain_text: str = "", background: bool = False) -> bool:
-    """
-    Wrapper for sending email.
-    If background=True, starts a background daemon thread and returns True immediately.
-    If background=False, runs synchronously and returns True/False.
-    """
+    """Backward-compatible wrapper routing to Resend API."""
     if background:
         send_email_in_background(to_email, subject, html_content, plain_text)
         return True
-    ok, _ = send_email_detailed(to_email, subject, html_content, plain_text)
+    ok, _ = send_resend_email_detailed(to_email, subject, html_content, plain_text)
     return ok
 
 
 def send_email(to_email: str, subject: str, html_content: str, plain_text: str = "", background: bool = True):
-    """
-    Standard email dispatcher. Defaults to non-blocking background thread (background=True)
-    for cloud responsiveness. Set background=False to wait for synchronous response.
-    """
+    """Standard email dispatcher defaulting to non-blocking background delivery."""
     if background:
         return send_email_in_background(to_email, subject, html_content, plain_text)
     return send_smtp_email(to_email, subject, html_content, plain_text, background=False)
@@ -1177,7 +934,7 @@ def send_otp(req: SendOTPRequest, db: Session = Depends(get_db)):
     db.add(otp_record)
     db.commit()
 
-    smtp_from_name = os.getenv("SMTP_FROM_NAME", "PrasaTek System Solutions").strip()
+    sender_from_name = "PrasaTek System Solutions"
 
     html_content = f"""
     <!DOCTYPE html>
@@ -1327,7 +1084,7 @@ def register_business(req: RegisterBusinessRequest, db: Session = Depends(get_db
 
     log_activity(db, business_code, "System", "BUSINESS_REGISTERED", f"Business '{new_biz.name}' registered with initial admin account.")
 
-    # Send official Welcome Email via Zoho SMTP (non-blocking try/except)
+    # Send official Welcome Email via Resend HTTPS API (non-blocking background thread)
     welcome_html = f"""
     <!DOCTYPE html>
     <html>
