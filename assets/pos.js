@@ -167,6 +167,10 @@ function hasUserTabPermission(tabName) {
   if (normalized === 'stock') return Boolean(perms.stock);
   if (normalized === 'users' || normalized === 'staff') return Boolean(perms.users);
   if (normalized === 'reports') return Boolean(perms.reports);
+  if (normalized === 'settings') {
+    return Boolean(perms.users || user.role_title === 'Store Manager' || user.role_title === 'Admin');
+  }
+  if (normalized === 'support') return true;
   return false;
 }
 
@@ -949,10 +953,13 @@ async function handleSecureAdminSubmit(e) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        business_code: AppState.business.business_code,
-        user_id: AppState.pendingAdminUser.id,
+        business_code: AppState.business ? AppState.business.business_code : '',
+        user_id: AppState.pendingAdminUser ? AppState.pendingAdminUser.id : null,
+        current_username: AppState.pendingAdminUser ? AppState.pendingAdminUser.username : 'user',
+        current_password: '123',
         new_username: newUsername,
         new_password: newPassword,
+        new_full_name: fullName || 'Store Admin',
         full_name: fullName || 'Store Admin'
       })
     });
@@ -1046,8 +1053,8 @@ function switchPOSTab(tab) {
 
   AppState.currentTab = normalizedTab;
 
-  // Strict Tab Isolation across all 6 main tabs
-  const tabs = ['dashboard', 'billing', 'items', 'stock', 'users', 'reports'];
+  // Strict Tab Isolation across all 8 main tabs
+  const tabs = ['dashboard', 'billing', 'items', 'stock', 'users', 'reports', 'settings', 'support'];
   tabs.forEach(t => {
     const btn = document.getElementById(`nav-btn-${t}`);
     const sec = document.getElementById(`tab-${t}`);
@@ -1091,6 +1098,10 @@ function switchPOSTab(tab) {
     loadUsersTable();
   } else if (normalizedTab === 'reports') {
     switchReportsSubTab(AppState.currentReportsSubTab || 'sales');
+  } else if (normalizedTab === 'settings') {
+    loadBusinessSettingsForm();
+  } else if (normalizedTab === 'support') {
+    loadMerchantSupportTickets();
   }
   return true;
 }
@@ -4514,6 +4525,14 @@ async function loadAdminOverviewStats() {
           maximumFractionDigits: 2
         });
       }
+
+      const openTicketsEl = document.getElementById('admin-stat-open-tickets');
+      const openTicketsSub = document.getElementById('admin-stat-open-tickets-sub');
+      const ticketsBadge = document.getElementById('admin-tickets-badge');
+      const openCount = data.open_support_tickets ?? (data.stats && data.stats.open_support_tickets) ?? 0;
+      if (openTicketsEl) openTicketsEl.textContent = openCount;
+      if (openTicketsSub) openTicketsSub.textContent = `${openCount} Pending Replies`;
+      if (ticketsBadge) ticketsBadge.textContent = openCount;
     }
   } catch (err) {
     console.error("Failed to load admin stats:", err);
@@ -5114,6 +5133,947 @@ function logoutMasterAdmin() {
   localStorage.removeItem('supiripos_admin_email');
   showToast("Master Admin session ended.", "info", 2000);
   showView('landing');
+}
+
+// ===========================================================================
+// SECTION: BUSINESS SETTINGS & DELETION WITH RESEND OTP VERIFICATION
+// ===========================================================================
+const BizOtpState = {
+  action: 'UPDATE_SETTINGS', // 'UPDATE_SETTINGS' | 'DELETE_BUSINESS'
+  pendingPayload: null
+};
+
+function updateLogoPreview() {
+  const input = document.getElementById('biz-set-logo');
+  const preview = document.getElementById('biz-set-logo-preview');
+  if (input && preview) {
+    preview.src = input.value.trim() || '/assets/logo.png';
+  }
+}
+
+function loadBusinessSettingsForm() {
+  const biz = AppState.business;
+  if (!biz) return;
+
+  const codeBadge = document.getElementById('biz-set-badge-code');
+  if (codeBadge) codeBadge.textContent = biz.business_code;
+
+  const nameInput = document.getElementById('biz-set-name');
+  if (nameInput) nameInput.value = biz.name || '';
+
+  const ownerInput = document.getElementById('biz-set-owner');
+  if (ownerInput) ownerInput.value = biz.owner_name || '';
+
+  const emailInput = document.getElementById('biz-set-email');
+  if (emailInput) emailInput.value = biz.email || '';
+
+  const phoneInput = document.getElementById('biz-set-phone');
+  if (phoneInput) phoneInput.value = biz.phone || '';
+
+  const addressInput = document.getElementById('biz-set-address');
+  if (addressInput) addressInput.value = biz.address || '';
+
+  const footerInput = document.getElementById('biz-set-footer');
+  if (footerInput) footerInput.value = biz.receipt_footer || 'Thank You! Come Again! / ස්තූතියි! නැවත එන්න!';
+
+  const logoInput = document.getElementById('biz-set-logo');
+  if (logoInput) {
+    logoInput.value = biz.logo_base64 || '/assets/logo.png';
+    updateLogoPreview();
+  }
+}
+
+async function initiateBusinessSettingsUpdate() {
+  const biz = AppState.business;
+  if (!biz) {
+    showToast("No active business session found.", "error");
+    return;
+  }
+
+  const name = document.getElementById('biz-set-name').value.trim();
+  const owner_name = document.getElementById('biz-set-owner').value.trim();
+  const phone = document.getElementById('biz-set-phone').value.trim();
+  const address = document.getElementById('biz-set-address').value.trim();
+  const receipt_footer = document.getElementById('biz-set-footer').value.trim();
+  const logo_base64 = document.getElementById('biz-set-logo').value.trim();
+
+  if (!name || !owner_name || !phone || !address) {
+    showToast("Please fill all required store fields.", "warning");
+    return;
+  }
+
+  BizOtpState.action = 'UPDATE_SETTINGS';
+  BizOtpState.pendingPayload = {
+    name,
+    owner_name,
+    phone,
+    address,
+    receipt_footer,
+    logo_base64
+  };
+
+  const btn = document.getElementById('btn-save-biz-settings');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Requesting Security Code...";
+  }
+
+  try {
+    const res = await fetch('/api/business/request-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        business_code: biz.business_code,
+        action: 'UPDATE_SETTINGS'
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Failed to dispatch verification code.");
+
+    openBizOtpModal('UPDATE_SETTINGS', data.masked_email || biz.email);
+    showToast(`Verification code sent to ${data.masked_email || 'owner email'}.`, "info", 4000);
+  } catch (err) {
+    showToast(err.message, "error");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "💾 Save Profile Changes (Sends OTP)";
+    }
+  }
+}
+
+async function initiateBusinessDeletion() {
+  const biz = AppState.business;
+  if (!biz) return;
+
+  const confirmMsg = `CRITICAL WARNING:\nAre you sure you want to delete '${biz.name}' (${biz.business_code})?\n\nThis will permanently delete all:\n- Products & Inventory\n- Customer Bills & Invoices\n- Credit Customer Ledgers\n- Staff User Accounts\n\nA security code will be sent to the owner's email to authorize deletion.`;
+  if (!confirm(confirmMsg)) {
+    return;
+  }
+
+  BizOtpState.action = 'DELETE_BUSINESS';
+  BizOtpState.pendingPayload = null;
+
+  showToast("Requesting deletion security code...", "info", 2000);
+
+  try {
+    const res = await fetch('/api/business/request-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        business_code: biz.business_code,
+        action: 'DELETE_BUSINESS'
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Failed to dispatch deletion code.");
+
+    openBizOtpModal('DELETE_BUSINESS', data.masked_email || biz.email);
+    showToast(`⚠️ Deletion verification code sent to ${data.masked_email || 'owner email'}.`, "warning", 5000);
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+function openBizOtpModal(action, maskedEmail) {
+  const titleEl = document.getElementById('biz-otp-title');
+  const badgeEl = document.getElementById('biz-otp-action-badge');
+  const emailEl = document.getElementById('biz-otp-target-email');
+  const codeInput = document.getElementById('biz-otp-code');
+  const submitBtn = document.getElementById('btn-biz-otp-submit');
+
+  if (emailEl) emailEl.textContent = maskedEmail || 'owner email';
+  if (codeInput) codeInput.value = '';
+
+  if (action === 'DELETE_BUSINESS') {
+    if (titleEl) titleEl.textContent = "⚠️ Confirm Store Deletion";
+    if (badgeEl) {
+      badgeEl.className = "badge badge-rose";
+      badgeEl.style.cssText = "background: rgba(239,68,68,0.2); color: #f87171; border: 1px solid rgba(239,68,68,0.4);";
+      badgeEl.textContent = "PERMANENT DELETION";
+    }
+    if (submitBtn) {
+      submitBtn.className = "btn btn-danger btn-lg";
+      submitBtn.textContent = "Authorize Permanent Deletion";
+    }
+  } else {
+    if (titleEl) titleEl.textContent = "🔐 Security Verification";
+    if (badgeEl) {
+      badgeEl.className = "badge badge-cyan";
+      badgeEl.style.cssText = "";
+      badgeEl.textContent = "PROFILE UPDATE";
+    }
+    if (submitBtn) {
+      submitBtn.className = "btn btn-emerald btn-lg";
+      submitBtn.textContent = "Confirm & Save Changes";
+    }
+  }
+
+  const modal = document.getElementById('modal-biz-otp');
+  if (modal) modal.classList.add('active');
+  if (codeInput) codeInput.focus();
+}
+
+function closeBizOtpModal() {
+  const modal = document.getElementById('modal-biz-otp');
+  if (modal) modal.classList.remove('active');
+}
+
+async function handleBizOtpSubmit(e) {
+  e.preventDefault();
+  const biz = AppState.business;
+  if (!biz) return;
+
+  const otpCode = document.getElementById('biz-otp-code').value.trim();
+  if (!otpCode || otpCode.length !== 6) {
+    showToast("Please enter a valid 6-digit verification code.", "warning");
+    return;
+  }
+
+  const submitBtn = document.getElementById('btn-biz-otp-submit');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Verifying...";
+  }
+
+  try {
+    if (BizOtpState.action === 'DELETE_BUSINESS') {
+      const res = await fetch('/api/business/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          business_code: biz.business_code,
+          otp_code: otpCode
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Deletion failed.");
+
+      closeBizOtpModal();
+      showToast(data.message || "Business deleted permanently.", "info", 5000);
+      switchBusinessTerminal();
+    } else {
+      // UPDATE_SETTINGS
+      const payload = Object.assign({}, BizOtpState.pendingPayload, {
+        business_code: biz.business_code,
+        otp_code: otpCode
+      });
+
+      const res = await fetch('/api/business/update-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Failed to update business settings.");
+
+      closeBizOtpModal();
+      showToast(data.message || "Store profile updated successfully!", "success", 4000);
+
+      if (data.business) {
+        AppState.business = Object.assign({}, AppState.business, data.business);
+        localStorage.setItem('supiripos_biz_session', JSON.stringify(AppState.business));
+
+        const shopNameEl = document.getElementById('ws-shop-name');
+        if (shopNameEl) shopNameEl.textContent = data.business.name;
+        const shopLogoEl = document.getElementById('ws-shop-logo');
+        if (shopLogoEl && data.business.logo_base64) shopLogoEl.src = data.business.logo_base64;
+
+        loadBusinessSettingsForm();
+      }
+    }
+  } catch (err) {
+    showToast(err.message, "error");
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = (BizOtpState.action === 'DELETE_BUSINESS') ? "Authorize Permanent Deletion" : "Confirm & Save Changes";
+    }
+  }
+}
+
+// ===========================================================================
+// SECTION: MERCHANT SUPPORT TICKETS
+// ===========================================================================
+async function loadMerchantSupportTickets() {
+  const biz = AppState.business;
+  if (!biz) return;
+
+  const container = document.getElementById('merchant-support-tickets-list');
+  const countBadge = document.getElementById('merchant-tickets-count-badge');
+  if (container) {
+    container.innerHTML = `<div style="text-align: center; padding: 30px; color: var(--text-dim); font-size: 13px;">Loading support tickets...</div>`;
+  }
+
+  try {
+    const res = await fetch(`/api/support/tickets?business_code=${encodeURIComponent(biz.business_code)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Failed to load support tickets.");
+
+    const tickets = data.tickets || [];
+    if (countBadge) countBadge.textContent = `${tickets.length} ${tickets.length === 1 ? 'Ticket' : 'Tickets'}`;
+
+    if (!container) return;
+
+    if (tickets.length === 0) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 40px 20px; color: var(--text-dim);">
+          <div style="font-size: 32px; margin-bottom: 8px;">🎧</div>
+          <div style="font-size: 15px; font-weight: 600; color: #ffffff;">No support tickets submitted yet</div>
+          <div style="font-size: 12px; margin-top: 4px;">Use the form on the left to submit an inquiry anytime.</div>
+        </div>
+      `;
+      return;
+    }
+
+    let html = '';
+    tickets.forEach(t => {
+      const isResolved = (t.status === 'resolved');
+      const dateStr = t.created_at ? t.created_at.replace('T', ' ').substring(0, 16) : '—';
+      const repliedStr = t.replied_at ? t.replied_at.replace('T', ' ').substring(0, 16) : '';
+
+      html += `
+        <div class="glass-panel" style="padding: 16px; border-color: ${isResolved ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.35)'};">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <div style="font-size: 14px; font-weight: 700; color: #ffffff;">
+              <span style="color: var(--cyan); font-family: var(--font-mono); font-size: 12px;">#${t.id}</span> &bull; ${escapeAdminHtml(t.subject)}
+            </div>
+            ${isResolved 
+              ? '<span class="badge badge-emerald" style="font-size: 11px;">RESOLVED</span>' 
+              : '<span class="badge badge-warning" style="font-size: 11px;">OPEN</span>'}
+          </div>
+
+          <div style="font-size: 11px; color: var(--text-dim); margin-bottom: 8px;">
+            Submitted on ${dateStr}
+          </div>
+
+          <div style="font-size: 13px; color: #cbd5e1; line-height: 1.5; white-space: pre-wrap; background: rgba(0,0,0,0.25); padding: 10px; border-radius: 6px; margin-bottom: 8px;">${escapeAdminHtml(t.message)}</div>
+
+          ${t.admin_reply ? `
+            <div style="background: rgba(16, 185, 129, 0.08); border-left: 3px solid var(--emerald); padding: 10px 14px; border-radius: 6px; margin-top: 8px;">
+              <div style="font-size: 11px; font-weight: 700; color: var(--emerald); margin-bottom: 3px;">
+                💬 Official PrasaTek Response ${repliedStr ? `(${repliedStr})` : ''}:
+              </div>
+              <div style="font-size: 13px; color: #ffffff; line-height: 1.5; white-space: pre-wrap;">${escapeAdminHtml(t.admin_reply)}</div>
+            </div>
+          ` : `
+            <div style="font-size: 11.5px; color: #f59e0b; display: flex; align-items: center; gap: 5px; margin-top: 6px;">
+              <span>⏳</span> <span>Our technical support team is reviewing your ticket.</span>
+            </div>
+          `}
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+  } catch (err) {
+    console.error("Failed to load merchant tickets:", err);
+    if (container) {
+      container.innerHTML = `<div style="text-align: center; padding: 20px; color: #ef4444; font-size: 13px;">Error loading tickets: ${escapeAdminHtml(err.message)}</div>`;
+    }
+  }
+}
+
+async function handleCreateSupportTicket(e) {
+  e.preventDefault();
+  const biz = AppState.business;
+  if (!biz) return;
+
+  const subject = document.getElementById('support-ticket-subject').value.trim();
+  const message = document.getElementById('support-ticket-message').value.trim();
+
+  if (!subject || !message) {
+    showToast("Please enter ticket subject and message details.", "warning");
+    return;
+  }
+
+  const btn = document.getElementById('btn-submit-support-ticket');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Submitting Ticket...";
+  }
+
+  try {
+    const res = await fetch('/api/support/tickets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        business_code: biz.business_code,
+        subject,
+        message
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Failed to submit ticket.");
+
+    document.getElementById('form-create-support-ticket').reset();
+    showToast(data.message || `Support ticket #${data.ticket.id} submitted successfully!`, "success", 4000);
+    await loadMerchantSupportTickets();
+  } catch (err) {
+    showToast(err.message, "error");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "🚀 Submit Support Ticket";
+    }
+  }
+}
+
+// ===========================================================================
+// SECTION: MASTER ADMIN SUPPORT TICKETS CONTROLLER
+// ===========================================================================
+const AdminSupportState = {
+  tickets: [],
+  filter: 'all', // 'all' | 'open' | 'resolved'
+  searchTerm: '',
+  currentTicket: null
+};
+
+function switchMasterAdminTab(tab) {
+  const btnStores = document.getElementById('admin-nav-tab-stores');
+  const btnSupport = document.getElementById('admin-nav-tab-support');
+  const secStores = document.getElementById('admin-sec-stores');
+  const secSupport = document.getElementById('admin-sec-support');
+
+  if (tab === 'support') {
+    if (btnStores) { btnStores.classList.remove('btn-cyan'); btnStores.classList.add('btn-glass'); }
+    if (btnSupport) { btnSupport.classList.remove('btn-glass'); btnSupport.classList.add('btn-cyan'); }
+    if (secStores) secStores.style.display = 'none';
+    if (secSupport) secSupport.style.display = 'block';
+    loadAdminSupportTickets();
+  } else {
+    if (btnSupport) { btnSupport.classList.remove('btn-cyan'); btnSupport.classList.add('btn-glass'); }
+    if (btnStores) { btnStores.classList.remove('btn-glass'); btnStores.classList.add('btn-cyan'); }
+    if (secSupport) secSupport.style.display = 'none';
+    if (secStores) secStores.style.display = 'block';
+    loadAdminBusinesses();
+  }
+}
+
+async function loadAdminSupportTickets() {
+  const tbody = document.getElementById('admin-tickets-table-body');
+  if (tbody) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 30px; color: var(--text-dim);">Loading support tickets...</td></tr>`;
+  }
+
+  try {
+    const res = await fetch('/api/admin/support/tickets', {
+      headers: getAdminAuthHeaders()
+    });
+    if (res.status === 401 || res.status === 403) {
+      logoutMasterAdmin();
+      return;
+    }
+    const data = await res.json();
+    if (data.success) {
+      AdminSupportState.tickets = data.tickets || [];
+      const openCount = data.open_count || 0;
+
+      const badge = document.getElementById('admin-tickets-badge');
+      if (badge) badge.textContent = openCount;
+
+      const statOpen = document.getElementById('admin-stat-open-tickets');
+      if (statOpen) statOpen.textContent = openCount;
+
+      const statOpenSub = document.getElementById('admin-stat-open-tickets-sub');
+      if (statOpenSub) statOpenSub.textContent = `${openCount} Pending Replies`;
+
+      filterAdminSupportTickets();
+    }
+  } catch (err) {
+    console.error("Failed to load admin support tickets:", err);
+  }
+}
+
+function setAdminTicketFilter(filter) {
+  AdminSupportState.filter = filter;
+  ['all', 'open', 'resolved'].forEach(f => {
+    const btn = document.getElementById(`admin-ticket-filter-${f}`);
+    if (btn) {
+      if (f === filter) {
+        btn.classList.remove('btn-glass');
+        btn.classList.add('btn-cyan');
+      } else {
+        btn.classList.remove('btn-cyan');
+        btn.classList.add('btn-glass');
+      }
+    }
+  });
+  filterAdminSupportTickets();
+}
+
+function filterAdminSupportTickets() {
+  const input = document.getElementById('admin-tickets-search-input');
+  const term = (input ? input.value : '').toLowerCase().trim();
+  AdminSupportState.searchTerm = term;
+
+  let list = AdminSupportState.tickets || [];
+
+  if (AdminSupportState.filter === 'open') {
+    list = list.filter(t => t.status === 'open');
+  } else if (AdminSupportState.filter === 'resolved') {
+    list = list.filter(t => t.status === 'resolved');
+  }
+
+  if (term) {
+    list = list.filter(t => {
+      const matchSub = (t.subject || '').toLowerCase().includes(term);
+      const matchMsg = (t.message || '').toLowerCase().includes(term);
+      const matchStore = (t.business_name || '').toLowerCase().includes(term);
+      const matchCode = (t.business_code || '').toLowerCase().includes(term);
+      const matchEmail = (t.owner_email || '').toLowerCase().includes(term);
+      return matchSub || matchMsg || matchStore || matchCode || matchEmail;
+    });
+  }
+
+  renderAdminSupportTicketsTable(list);
+}
+
+function renderAdminSupportTicketsTable(list) {
+  const tbody = document.getElementById('admin-tickets-table-body');
+  const badge = document.getElementById('admin-tickets-count-badge');
+  if (badge) {
+    badge.textContent = `${list.length} ${list.length === 1 ? 'Ticket' : 'Tickets'}`;
+  }
+  if (!tbody) return;
+
+  if (list.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align: center; padding: 48px; color: var(--text-dim);">
+          <div style="font-size: 32px; margin-bottom: 8px;">🎧</div>
+          <div style="font-size: 15px; font-weight: 600; color: #ffffff;">No support tickets found</div>
+          <div style="font-size: 12px; margin-top: 4px;">No tickets match your active filter.</div>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  let html = '';
+  list.forEach(t => {
+    const isResolved = (t.status === 'resolved');
+    const dateStr = t.created_at ? t.created_at.replace('T', ' ').substring(0, 16) : '—';
+
+    html += `
+      <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); transition: background 0.15s ease;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+        <!-- Ticket # -->
+        <td style="padding: 14px 16px; font-family: var(--font-mono); font-weight: 700; color: var(--cyan);">
+          #${t.id}
+        </td>
+
+        <!-- Store & Location -->
+        <td style="padding: 14px 16px;">
+          <div style="font-weight: 700; color: #ffffff;">${escapeAdminHtml(t.business_name || 'Store')}</div>
+          <div style="font-size: 11px; color: var(--cyan); font-family: var(--font-mono); margin-top: 2px;">${escapeAdminHtml(t.business_code)}</div>
+        </td>
+
+        <!-- Owner & Email -->
+        <td style="padding: 14px 16px;">
+          <div style="font-weight: 600; color: #f1f5f9; font-size: 13px;">${escapeAdminHtml(t.owner_name || '—')}</div>
+          <div style="font-size: 11px; color: var(--text-dim); margin-top: 2px; font-family: var(--font-mono);">${escapeAdminHtml(t.owner_email || '—')}</div>
+        </td>
+
+        <!-- Subject & Inquiry -->
+        <td style="padding: 14px 16px;">
+          <div style="font-weight: 700; color: #ffffff; font-size: 13.5px;">${escapeAdminHtml(t.subject)}</div>
+          <div style="font-size: 12px; color: var(--text-muted); max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 3px;" title="${escapeAdminHtml(t.message)}">
+            ${escapeAdminHtml(t.message)}
+          </div>
+          ${t.admin_reply ? `
+            <div style="font-size: 11px; color: var(--emerald); margin-top: 4px;">
+              ✓ Replied: ${escapeAdminHtml(t.admin_reply.substring(0, 60))}...
+            </div>
+          ` : ''}
+        </td>
+
+        <!-- Status -->
+        <td style="padding: 14px 16px;">
+          ${isResolved
+            ? '<span class="badge badge-emerald" style="font-size: 11px; padding: 3px 10px;">RESOLVED</span>'
+            : '<span class="badge badge-warning" style="font-size: 11px; padding: 3px 10px;">OPEN</span>'}
+        </td>
+
+        <!-- Created -->
+        <td style="padding: 14px 16px; font-size: 11.5px; color: var(--text-dim);">
+          ${dateStr}
+        </td>
+
+        <!-- Actions -->
+        <td style="padding: 14px 16px; text-align: right;">
+          <button class="btn btn-sm btn-emerald" onclick="openAdminTicketReplyModal(${t.id})" style="padding: 4px 12px; font-size: 11.5px; display: inline-flex; align-items: center; gap: 5px;">
+            <span>💬 Reply</span>
+          </button>
+        </td>
+      </tr>
+    `;
+  });
+
+  tbody.innerHTML = html;
+}
+
+function openAdminTicketReplyModal(ticketId) {
+  const t = AdminSupportState.tickets.find(item => item.id === ticketId);
+  if (!t) return;
+  AdminSupportState.currentTicket = t;
+
+  document.getElementById('admin-reply-ticket-id').value = t.id;
+  document.getElementById('admin-reply-ticket-badge').textContent = `#${t.id}`;
+  document.getElementById('admin-reply-ticket-subject').textContent = t.subject;
+  document.getElementById('admin-reply-ticket-store').textContent = t.business_name || t.business_code;
+  document.getElementById('admin-reply-ticket-owner').textContent = t.owner_name || 'Owner';
+  document.getElementById('admin-reply-ticket-email').textContent = t.owner_email || 'No email';
+  document.getElementById('admin-reply-ticket-message').textContent = t.message;
+
+  const statusBadge = document.getElementById('admin-reply-ticket-status-badge');
+  if (statusBadge) {
+    statusBadge.className = (t.status === 'resolved') ? "badge badge-emerald" : "badge badge-warning";
+    statusBadge.textContent = t.status.toUpperCase();
+  }
+
+  const replyText = document.getElementById('admin-reply-text');
+  if (replyText) replyText.value = t.admin_reply || '';
+
+  const statusSelect = document.getElementById('admin-reply-status');
+  if (statusSelect) statusSelect.value = t.status || 'resolved';
+
+  const modal = document.getElementById('modal-admin-reply-ticket');
+  if (modal) modal.classList.add('active');
+  if (replyText) replyText.focus();
+}
+
+function closeAdminTicketReplyModal() {
+  const modal = document.getElementById('modal-admin-reply-ticket');
+  if (modal) modal.classList.remove('active');
+}
+
+async function handleAdminSendTicketReply(e) {
+  e.preventDefault();
+  const ticketId = document.getElementById('admin-reply-ticket-id').value;
+  const reply_message = document.getElementById('admin-reply-text').value.trim();
+  const status = document.getElementById('admin-reply-status').value;
+
+  if (!reply_message) {
+    showToast("Please enter an official reply message.", "warning");
+    return;
+  }
+
+  const btn = document.getElementById('btn-admin-submit-reply');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Sending Email Reply...";
+  }
+
+  try {
+    const res = await fetch(`/api/admin/support/tickets/${ticketId}/reply`, {
+      method: 'POST',
+      headers: getAdminAuthHeaders(),
+      body: JSON.stringify({
+        reply_message,
+        status
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Failed to dispatch email reply.");
+
+    closeAdminTicketReplyModal();
+    showToast(data.message || "Official reply dispatched via Resend email!", "success", 4000);
+    await loadAdminSupportTickets();
+  } catch (err) {
+    showToast(err.message, "error");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "🚀 Send Email Reply via Resend";
+    }
+  }
+}
+
+// ===========================================================================
+// SECTION: PUBLIC SUPPORT TICKET MODAL (LANDING & LOGIN PAGE)
+// ===========================================================================
+function openPublicSupportModal() {
+  const modal = document.getElementById('modal-public-support');
+  if (!modal) return;
+
+  const emailInput = document.getElementById('public-ticket-email');
+  const bizCodeInput = document.getElementById('public-ticket-bizcode');
+
+  if (AppState.business) {
+    if (emailInput && AppState.business.email) emailInput.value = AppState.business.email;
+    if (bizCodeInput && AppState.business.business_code) bizCodeInput.value = AppState.business.business_code;
+  } else {
+    const unlockCode = document.getElementById('unlock-biz-code');
+    if (unlockCode && unlockCode.value && bizCodeInput) {
+      bizCodeInput.value = unlockCode.value.trim().toUpperCase();
+    }
+  }
+
+  modal.classList.add('active');
+}
+
+function closePublicSupportModal() {
+  const modal = document.getElementById('modal-public-support');
+  if (modal) modal.classList.remove('active');
+}
+
+async function handlePublicSupportSubmit(e) {
+  e.preventDefault();
+  const email = document.getElementById('public-ticket-email').value.trim();
+  const name = document.getElementById('public-ticket-name').value.trim();
+  const business_code = document.getElementById('public-ticket-bizcode').value.trim().toUpperCase();
+  const subject = document.getElementById('public-ticket-subject').value.trim();
+  const message = document.getElementById('public-ticket-message').value.trim();
+
+  if (!email || !subject || !message) {
+    showToast("Please enter your registered email address, subject, and message.", "warning");
+    return;
+  }
+
+  const btn = document.getElementById('btn-submit-public-ticket');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "⏳ Submitting Ticket...";
+  }
+
+  try {
+    const res = await fetch('/api/support/tickets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, name, business_code, subject, message })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Failed to submit support ticket.");
+
+    closePublicSupportModal();
+    const form = document.getElementById('form-public-support');
+    if (form) form.reset();
+    showToast(data.message || `Support ticket #${data.ticket.id} submitted! Confirmation email sent to ${email}.`, "success", 6000);
+  } catch (err) {
+    showToast(err.message, "error");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "🚀 Submit Support Ticket";
+    }
+  }
+}
+
+// ===========================================================================
+// SECTION: POS USER DROPDOWN MENU
+// ===========================================================================
+function togglePosUserDropdown(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  const menu = document.getElementById('pos-user-dropdown-menu');
+  if (!menu) return;
+
+  const isVisible = (menu.style.display === 'block');
+  if (isVisible) {
+    menu.style.display = 'none';
+  } else {
+    const nameEl = document.getElementById('dropdown-user-name');
+    const codeEl = document.getElementById('dropdown-biz-code');
+    const roleEl = document.getElementById('dropdown-role-title');
+
+    if (nameEl) nameEl.textContent = (AppState.user && (AppState.user.full_name || AppState.user.username)) || 'Staff User';
+    if (codeEl) codeEl.textContent = (AppState.business && AppState.business.business_code) || 'PT-STORE';
+    if (roleEl) roleEl.textContent = (AppState.user && AppState.user.role_title) || 'Store Manager';
+
+    menu.style.display = 'block';
+  }
+}
+
+function closePosUserDropdown() {
+  const menu = document.getElementById('pos-user-dropdown-menu');
+  if (menu) menu.style.display = 'none';
+}
+
+window.addEventListener('click', (e) => {
+  const container = document.getElementById('pos-user-dropdown-container');
+  const menu = document.getElementById('pos-user-dropdown-menu');
+  if (container && menu && !container.contains(e.target)) {
+    menu.style.display = 'none';
+  }
+});
+
+// ===========================================================================
+// SECTION: POS USER DROPDOWN - QUICK SUPPORT TICKET MODAL
+// ===========================================================================
+function openPosSupportModal() {
+  const modal = document.getElementById('modal-pos-ticket');
+  if (!modal) return;
+
+  const bizNameEl = document.getElementById('pos-ticket-modal-bizname');
+  const bizCodeEl = document.getElementById('pos-ticket-modal-bizcode');
+
+  if (bizNameEl && AppState.business) bizNameEl.textContent = AppState.business.name || 'Your Store';
+  if (bizCodeEl && AppState.business) bizCodeEl.textContent = AppState.business.business_code || '';
+
+  modal.classList.add('active');
+}
+
+function closePosSupportModal() {
+  const modal = document.getElementById('modal-pos-ticket');
+  if (modal) modal.classList.remove('active');
+}
+
+async function handlePosModalTicketSubmit(e) {
+  e.preventDefault();
+  if (!AppState.business) {
+    showToast("No active store session found.", "error");
+    return;
+  }
+
+  const subject = document.getElementById('pos-modal-ticket-subject').value.trim();
+  const message = document.getElementById('pos-modal-ticket-message').value.trim();
+
+  if (!subject || !message) {
+    showToast("Subject and message are required.", "warning");
+    return;
+  }
+
+  const btn = document.getElementById('btn-submit-pos-modal-ticket');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "⏳ Submitting...";
+  }
+
+  try {
+    const res = await fetch('/api/support/tickets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        business_code: AppState.business.business_code,
+        subject,
+        message
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Failed to submit support ticket.");
+
+    closePosSupportModal();
+    const form = document.getElementById('form-pos-modal-ticket');
+    if (form) form.reset();
+    showToast(data.message || `Support Ticket #${data.ticket.id} created! Confirmation email sent to ${AppState.business.email || 'your email'}.`, "success", 6000);
+
+    // Refresh tickets list if on support tab
+    if (typeof loadMerchantSupportTickets === 'function') {
+      loadMerchantSupportTickets();
+    }
+  } catch (err) {
+    showToast(err.message, "error");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "🚀 Submit Ticket";
+    }
+  }
+}
+
+// ===========================================================================
+// SECTION: POS USER DROPDOWN - BUSINESS SETTINGS MODAL
+// ===========================================================================
+let modalPendingLogoBase64 = null;
+
+function openBusinessSettingsModal() {
+  if (!AppState.business) {
+    showToast("No active store session found.", "error");
+    return;
+  }
+
+  const modal = document.getElementById('modal-pos-settings');
+  if (!modal) return;
+
+  const b = AppState.business;
+  const nameInput = document.getElementById('modal-set-name');
+  const ownerInput = document.getElementById('modal-set-owner');
+  const phoneInput = document.getElementById('modal-set-phone');
+  const emailInput = document.getElementById('modal-set-email');
+  const addressInput = document.getElementById('modal-set-address');
+  const footerInput = document.getElementById('modal-set-footer');
+  const logoPreview = document.getElementById('modal-set-logo-preview');
+
+  if (nameInput) nameInput.value = b.name || '';
+  if (ownerInput) ownerInput.value = b.owner_name || '';
+  if (phoneInput) phoneInput.value = b.phone || '';
+  if (emailInput) emailInput.value = b.email || '';
+  if (addressInput) addressInput.value = b.address || '';
+  if (footerInput) footerInput.value = b.receipt_footer || '';
+  if (logoPreview) logoPreview.src = b.logo_base64 || '/assets/logo.png';
+  modalPendingLogoBase64 = b.logo_base64 || null;
+
+  modal.classList.add('active');
+}
+
+function closeBusinessSettingsModal() {
+  const modal = document.getElementById('modal-pos-settings');
+  if (modal) modal.classList.remove('active');
+}
+
+function previewModalLogo(input) {
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      modalPendingLogoBase64 = e.target.result;
+      const preview = document.getElementById('modal-set-logo-preview');
+      if (preview) preview.src = modalPendingLogoBase64;
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+
+async function handleModalSettingsSubmit(e) {
+  e.preventDefault();
+  if (!AppState.business) return;
+
+  const name = document.getElementById('modal-set-name').value.trim();
+  const owner_name = document.getElementById('modal-set-owner').value.trim();
+  const phone = document.getElementById('modal-set-phone').value.trim();
+  const address = document.getElementById('modal-set-address').value.trim();
+  const receipt_footer = document.getElementById('modal-set-footer').value.trim();
+
+  if (!name || !owner_name) {
+    showToast("Store name and owner name are required.", "warning");
+    return;
+  }
+
+  const payload = {
+    name,
+    owner_name,
+    phone,
+    address,
+    receipt_footer,
+    logo_base64: modalPendingLogoBase64
+  };
+
+  BizOtpState.action = 'UPDATE_SETTINGS';
+  BizOtpState.pendingPayload = payload;
+
+  closeBusinessSettingsModal();
+
+  // Trigger Resend OTP request
+  showToast("Requesting security verification code via Resend...", "info", 3000);
+
+  try {
+    const res = await fetch('/api/business/request-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        business_code: AppState.business.business_code,
+        action: 'UPDATE_SETTINGS'
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Failed to dispatch verification code.");
+
+    openBizOtpModal('UPDATE_SETTINGS', data.masked_email || AppState.business.email);
+    showToast(data.message || `Verification code sent to ${data.masked_email || AppState.business.email}`, "info", 5000);
+  } catch (err) {
+    showToast(err.message, "error");
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -705,6 +705,14 @@
           <span class="pulse-dot"></span>
           <span id="db-status-text">SUPABASE CLOUD ONLINE</span>
         </div>
+        <button class="btn btn-emerald btn-sm" onclick="openPublicSupportModal()"
+          style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700;">
+          <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24">
+            <path
+              d="M12 2C6.48 2 2 6.48 2 12v6c0 1.66 1.34 3 3 3h3v-8H5v-1c0-3.87 3.13-7 7-7s7 3.13 7 7v1h-3v8h3c1.66 0 3-1.34 3-3v-6c0-5.52-4.48-10-10-10z" />
+          </svg>
+          Need Help? / Support
+        </button>
         <button class="btn btn-glass btn-sm" onclick="openUserGuideModal()">
           <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
             <path
@@ -919,10 +927,14 @@
       </form>
 
       <div
-        style="margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border-glass); display: flex; justify-content: space-between; font-size: 12px;">
+        style="margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border-glass); display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
         <a href="javascript:void(0)" onclick="switchBusinessTerminal()"
           style="color: var(--cyan); text-decoration: none;">
           🔄 Switch Business
+        </a>
+        <a href="javascript:void(0)" onclick="openPublicSupportModal()"
+          style="color: var(--emerald); text-decoration: none; font-weight: 600;">
+          🎧 Need Help? / Support
         </a>
         <a href="javascript:void(0)" onclick="returnToLanding()" style="color: var(--text-dim); text-decoration: none;">
           Exit to Landing
@@ -1064,62 +1076,144 @@
           <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">Enterprise Sales Volume</div>
         </div>
 
+        <div class="glass-panel" style="padding: 20px; border-left: 4px solid #38bdf8;">
+          <div
+            style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">
+            Support Tickets</div>
+          <div id="admin-stat-open-tickets"
+            style="font-size: 32px; font-weight: 800; color: var(--cyan); margin-top: 6px;">0</div>
+          <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;"><span
+              id="admin-stat-open-tickets-sub">0 Pending Replies</span></div>
+        </div>
+
       </div>
 
-      <!-- Business Management Table Container -->
-      <div class="glass-panel" style="padding: 24px; border-radius: 16px;">
+      <!-- Navigation Tabs: Store Accounts vs Support Tickets -->
+      <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+        <button id="admin-nav-tab-stores" class="btn btn-sm btn-cyan" onclick="switchMasterAdminTab('stores')"
+          style="padding: 8px 18px; font-weight: 700; border-radius: 8px;">
+          🏬 Store Accounts
+        </button>
+        <button id="admin-nav-tab-support" class="btn btn-sm btn-glass" onclick="switchMasterAdminTab('support')"
+          style="padding: 8px 18px; font-weight: 700; border-radius: 8px; display: flex; align-items: center; gap: 8px;">
+          <span>🎧 Support Tickets</span>
+          <span id="admin-tickets-badge" class="badge badge-warning" style="font-size: 10px; padding: 2px 7px;">0</span>
+        </button>
+      </div>
 
-        <!-- Filter & Search Toolbar -->
-        <div
-          style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
+      <!-- SECTION A: STORES MANAGEMENT -->
+      <div id="admin-sec-stores">
+        <!-- Business Management Table Container -->
+        <div class="glass-panel" style="padding: 24px; border-radius: 16px;">
 
-          <div style="display: flex; align-items: center; gap: 12px; flex: 1; max-width: 500px;">
-            <input type="text" id="admin-search-input" class="form-control"
-              placeholder="🔍 Search store name, code, owner, phone, email..." oninput="filterAdminBusinesses()"
-              style="padding: 10px 14px; font-size: 13px;">
-          </div>
+          <!-- Filter & Search Toolbar -->
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
 
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <div
-              style="display: flex; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 8px; padding: 3px;">
-              <button id="admin-filter-all" class="btn btn-sm btn-cyan" onclick="setAdminFilter('all')"
-                style="border-radius: 6px; padding: 4px 12px;">All</button>
-              <button id="admin-filter-active" class="btn btn-sm btn-glass" onclick="setAdminFilter('active')"
-                style="border-radius: 6px; padding: 4px 12px;">Active</button>
-              <button id="admin-filter-suspended" class="btn btn-sm btn-glass" onclick="setAdminFilter('suspended')"
-                style="border-radius: 6px; padding: 4px 12px;">Suspended</button>
+            <div style="display: flex; align-items: center; gap: 12px; flex: 1; max-width: 500px;">
+              <input type="text" id="admin-search-input" class="form-control"
+                placeholder="🔍 Search store name, code, owner, phone, email..." oninput="filterAdminBusinesses()"
+                style="padding: 10px 14px; font-size: 13px;">
             </div>
-            <span id="admin-biz-count-badge" class="badge badge-cyan" style="font-size: 12px; padding: 6px 12px;">0
-              Stores</span>
+
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div
+                style="display: flex; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 8px; padding: 3px;">
+                <button id="admin-filter-all" class="btn btn-sm btn-cyan" onclick="setAdminFilter('all')"
+                  style="border-radius: 6px; padding: 4px 12px;">All</button>
+                <button id="admin-filter-active" class="btn btn-sm btn-glass" onclick="setAdminFilter('active')"
+                  style="border-radius: 6px; padding: 4px 12px;">Active</button>
+                <button id="admin-filter-suspended" class="btn btn-sm btn-glass" onclick="setAdminFilter('suspended')"
+                  style="border-radius: 6px; padding: 4px 12px;">Suspended</button>
+              </div>
+              <span id="admin-biz-count-badge" class="badge badge-cyan" style="font-size: 12px; padding: 6px 12px;">0
+                Stores</span>
+            </div>
+
+          </div>
+
+          <!-- Table View -->
+          <div style="overflow-x: auto; max-width: 100%;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+              <thead>
+                <tr
+                  style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted); background: rgba(0,0,0,0.25);">
+                  <th style="padding: 12px 14px;">Store Code &amp; Status</th>
+                  <th style="padding: 12px 14px;">Business / Store Name</th>
+                  <th style="padding: 12px 14px;">Owner &amp; Contact</th>
+                  <th style="padding: 12px 14px;">Terminal Login</th>
+                  <th style="padding: 12px 14px;">Inventory &amp; Invoices</th>
+                  <th style="padding: 12px 14px;">Registered</th>
+                  <th style="padding: 12px 14px; text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="admin-biz-table-body">
+                <tr>
+                  <td colspan="7" style="padding: 30px; text-align: center; color: var(--text-muted);">
+                    Loading enterprise businesses...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
         </div>
+      </div>
 
-        <!-- Table View -->
-        <div style="overflow-x: auto; max-width: 100%;">
-          <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
-            <thead>
-              <tr
-                style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted); background: rgba(0,0,0,0.25);">
-                <th style="padding: 12px 14px;">Store Code &amp; Status</th>
-                <th style="padding: 12px 14px;">Business / Store Name</th>
-                <th style="padding: 12px 14px;">Owner &amp; Contact</th>
-                <th style="padding: 12px 14px;">Terminal Login</th>
-                <th style="padding: 12px 14px;">Inventory &amp; Invoices</th>
-                <th style="padding: 12px 14px;">Registered</th>
-                <th style="padding: 12px 14px; text-align: right;">Actions</th>
-              </tr>
-            </thead>
-            <tbody id="admin-biz-table-body">
-              <tr>
-                <td colspan="7" style="padding: 30px; text-align: center; color: var(--text-muted);">
-                  Loading enterprise businesses...
-                </td>
-              </tr>
-            </tbody>
-          </table>
+      <!-- SECTION B: SUPPORT TICKETS MANAGEMENT -->
+      <div id="admin-sec-support" style="display: none;">
+        <div class="glass-panel" style="padding: 24px; border-radius: 16px;">
+          <!-- Filter & Search Toolbar -->
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
+            <div style="display: flex; align-items: center; gap: 12px; flex: 1; max-width: 500px;">
+              <input type="text" id="admin-tickets-search-input" class="form-control"
+                placeholder="🔍 Search ticket subject, store name, email, message..."
+                oninput="filterAdminSupportTickets()" style="padding: 10px 14px; font-size: 13px;">
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div
+                style="display: flex; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 8px; padding: 3px;">
+                <button id="admin-ticket-filter-all" class="btn btn-sm btn-cyan" onclick="setAdminTicketFilter('all')"
+                  style="border-radius: 6px; padding: 4px 12px;">All Tickets</button>
+                <button id="admin-ticket-filter-open" class="btn btn-sm btn-glass"
+                  onclick="setAdminTicketFilter('open')" style="border-radius: 6px; padding: 4px 12px;">Open /
+                  Pending</button>
+                <button id="admin-ticket-filter-resolved" class="btn btn-sm btn-glass"
+                  onclick="setAdminTicketFilter('resolved')"
+                  style="border-radius: 6px; padding: 4px 12px;">Resolved</button>
+              </div>
+              <span id="admin-tickets-count-badge" class="badge badge-cyan"
+                style="font-size: 12px; padding: 6px 12px;">0 Tickets</span>
+            </div>
+          </div>
+
+          <!-- Tickets Table -->
+          <div style="overflow-x: auto; max-width: 100%;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+              <thead>
+                <tr
+                  style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted); background: rgba(0,0,0,0.25);">
+                  <th style="padding: 12px 14px; width: 80px;">Ticket #</th>
+                  <th style="padding: 12px 14px;">Store &amp; Location</th>
+                  <th style="padding: 12px 14px;">Owner &amp; Email</th>
+                  <th style="padding: 12px 14px;">Subject &amp; Inquiry</th>
+                  <th style="padding: 12px 14px; width: 110px;">Status</th>
+                  <th style="padding: 12px 14px; width: 120px;">Created</th>
+                  <th style="padding: 12px 14px; text-align: right; width: 100px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="admin-tickets-table-body">
+                <tr>
+                  <td colspan="7" style="padding: 30px; text-align: center; color: var(--text-muted);">
+                    Loading support tickets...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
-
       </div>
 
     </main>
@@ -1193,18 +1287,101 @@
           onclick="switchPOSTab('reports')">
           📈 Reports
         </button>
+        <button id="nav-btn-settings" class="btn btn-sm btn-glass"
+          style="padding: 7px 11px; font-size: 13px; font-weight: 600; border-radius: 9px; gap: 5px; white-space: nowrap; flex-shrink: 0;"
+          onclick="switchPOSTab('settings')">
+          ⚙️ Settings
+        </button>
+        <button id="nav-btn-support" class="btn btn-sm btn-glass"
+          style="padding: 7px 11px; font-size: 13px; font-weight: 600; border-radius: 9px; gap: 5px; white-space: nowrap; flex-shrink: 0;"
+          onclick="switchPOSTab('support')">
+          🎧 Support
+        </button>
       </nav>
 
-      <!-- Right: Legible User Pill, Guide & Logout — 100% VISIBLE AT ALL TIMES -->
+      <!-- Right: Legible User Pill Dropdown, Guide & Logout — 100% VISIBLE AT ALL TIMES -->
       <div style="display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-shrink: 0;">
-        <div class="badge"
-          style="background: rgba(255, 255, 255, 0.06); border: 1px solid var(--border-glass); padding: 6px 10px; font-size: 12.5px; font-weight: 600; color: #f8fafc; text-transform: none; white-space: nowrap; display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
-          <span>👤</span>
-          <span id="ws-staff-user"
-            style="max-width: 105px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block;">Supiri
-            Admin</span>
-          <span id="ws-staff-role" class="hide-below-2xl" style="color: var(--cyan); font-size: 11.5px;">•
-            Manager</span>
+        <!-- User Pill Dropdown Menu (Settings, Guide & Tickets) -->
+        <div id="pos-user-dropdown-container" style="position: relative; display: inline-block; flex-shrink: 0;">
+          <div id="ws-user-pill-btn" onclick="togglePosUserDropdown(event)" class="badge"
+            style="cursor: pointer; background: rgba(255, 255, 255, 0.08); border: 1px solid var(--border-glass); border-radius: 9px; padding: 6px 11px; font-size: 12.5px; font-weight: 600; color: #f8fafc; text-transform: none; white-space: nowrap; display: flex; align-items: center; gap: 6px; flex-shrink: 0; user-select: none; transition: all 0.2s;"
+            title="User Menu (Settings, Support & Guide)"
+            onmouseenter="this.style.borderColor='var(--cyan)'; this.style.background='rgba(6, 182, 212, 0.12)';"
+            onmouseleave="this.style.borderColor='var(--border-glass)'; this.style.background='rgba(255, 255, 255, 0.08)';">
+            <span>👤</span>
+            <span id="ws-staff-user"
+              style="max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block;">Supiri
+              Admin</span>
+            <span id="ws-staff-role" class="hide-below-2xl" style="color: var(--cyan); font-size: 11.5px;">•
+              Manager</span>
+            <span style="font-size: 9px; opacity: 0.7; margin-left: 2px;">▼</span>
+          </div>
+
+          <!-- Glassmorphic Dropdown Card -->
+          <div id="pos-user-dropdown-menu"
+            style="display: none; position: absolute; right: 0; top: calc(100% + 8px); min-width: 250px; background: rgba(15, 23, 42, 0.98); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 12px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7); z-index: 1000; padding: 8px 0; overflow: hidden;">
+
+            <!-- User summary header -->
+            <div style="padding: 10px 16px 8px 16px; border-bottom: 1px solid var(--border-glass);">
+              <div style="font-size: 13px; font-weight: 800; color: #ffffff;" id="dropdown-user-name">Staff User</div>
+              <div
+                style="font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; margin-top: 3px;">
+                <span class="badge badge-cyan" id="dropdown-biz-code"
+                  style="padding: 1px 6px; font-size: 10px;">PT-DEMO</span>
+                <span id="dropdown-role-title" style="color: var(--emerald); font-weight: 600;">Store Manager</span>
+              </div>
+            </div>
+
+            <!-- Dropdown Actions -->
+            <div style="padding: 6px 0;">
+              <!-- 1. Create Support Ticket -->
+              <a href="javascript:void(0)" onclick="openPosSupportModal(); closePosUserDropdown();"
+                style="display: flex; align-items: center; gap: 10px; padding: 10px 16px; color: #f1f5f9; text-decoration: none; font-size: 13px; transition: background 0.15s;"
+                onmouseenter="this.style.background='rgba(16, 185, 129, 0.12)'"
+                onmouseleave="this.style.background='transparent'">
+                <span style="font-size: 16px;">🎧</span>
+                <div>
+                  <div style="font-weight: 700; color: #ffffff;">Create Support Ticket</div>
+                  <div style="font-size: 11px; color: var(--text-dim);">Technical help &amp; inquiries</div>
+                </div>
+              </a>
+
+              <!-- 2. Business Settings -->
+              <a href="javascript:void(0)" onclick="openBusinessSettingsModal(); closePosUserDropdown();"
+                style="display: flex; align-items: center; gap: 10px; padding: 10px 16px; color: #f1f5f9; text-decoration: none; font-size: 13px; transition: background 0.15s;"
+                onmouseenter="this.style.background='rgba(6, 182, 212, 0.12)'"
+                onmouseleave="this.style.background='transparent'">
+                <span style="font-size: 16px;">⚙️</span>
+                <div>
+                  <div style="font-weight: 700; color: #ffffff;">Business Settings</div>
+                  <div style="font-size: 11px; color: var(--text-dim);">Store profile &amp; OTP security</div>
+                </div>
+              </a>
+
+              <!-- 3. User Guide -->
+              <a href="javascript:void(0)" onclick="openUserGuideModal(); closePosUserDropdown();"
+                style="display: flex; align-items: center; gap: 10px; padding: 10px 16px; color: #f1f5f9; text-decoration: none; font-size: 13px; transition: background 0.15s;"
+                onmouseenter="this.style.background='rgba(255, 255, 255, 0.08)'"
+                onmouseleave="this.style.background='transparent'">
+                <span style="font-size: 16px;">📖</span>
+                <div>
+                  <div style="font-weight: 700; color: #ffffff;">User Guide</div>
+                  <div style="font-size: 11px; color: var(--text-dim);">English &amp; සිංහල documentation</div>
+                </div>
+              </a>
+            </div>
+
+            <!-- Divider & Logout -->
+            <div style="border-top: 1px solid var(--border-glass); padding-top: 6px;">
+              <a href="javascript:void(0)" onclick="closePosUserDropdown(); logoutStaffUser();"
+                style="display: flex; align-items: center; gap: 10px; padding: 10px 16px; color: #f87171; text-decoration: none; font-size: 13px; transition: background 0.15s;"
+                onmouseenter="this.style.background='rgba(239, 68, 68, 0.12)'"
+                onmouseleave="this.style.background='transparent'">
+                <span style="font-size: 16px;">🚪</span>
+                <span style="font-weight: 700;">Logout Staff User</span>
+              </a>
+            </div>
+          </div>
         </div>
 
         <span id="ws-clock" class="hide-below-2xl"
@@ -2338,9 +2515,244 @@
 
       </section>
 
+      <!-- ========================================================================= -->
+      <!-- SECTION: TAB 7 - BUSINESS PROFILE & SETTINGS (WITH RESEND OTP)            -->
+      <!-- ========================================================================= -->
+      <section id="tab-settings" class="pos-tab-section"
+        style="display: none; flex-direction: column; gap: 20px; max-width: 960px; margin: 0 auto; width: 100%;">
+
+        <!-- Header -->
+        <div class="glass-panel" style="padding: 24px 28px; border-color: rgba(6, 182, 212, 0.35);">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <h2 style="font-size: 22px; font-weight: 800; color: #ffffff; margin: 0;">⚙️ Business Store Profile &
+                  Settings</h2>
+                <span class="badge badge-cyan">PROTECTED WITH EMAIL OTP</span>
+              </div>
+              <p style="margin: 6px 0 0 0; font-size: 13px; color: var(--text-muted); line-height: 1.5;">
+                Manage your store identity, physical location, contact info, and receipt footer. For high security, all
+                modifications and store deletion require one-time email OTP verification.
+              </p>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span id="biz-set-badge-code" class="badge badge-emerald"
+                style="font-size: 13px; padding: 6px 14px; font-family: var(--font-mono);">PT-00000</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Store Profile Form -->
+        <div class="glass-panel" style="padding: 28px; border-color: var(--border-glass);">
+          <form id="form-biz-settings" onsubmit="event.preventDefault(); initiateBusinessSettingsUpdate();"
+            autocomplete="off">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+              <div class="form-group">
+                <label class="form-label">Store / Shop Name *</label>
+                <input type="text" id="biz-set-name" class="form-control" placeholder="e.g. Royal Super City" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Owner Full Name *</label>
+                <input type="text" id="biz-set-owner" class="form-control" placeholder="e.g. Kamal Perera" required>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+              <div class="form-group">
+                <label class="form-label">Registered Owner Email (OTP Recipient)</label>
+                <input type="email" id="biz-set-email" class="form-control" readonly
+                  style="background: rgba(0, 0, 0, 0.3); color: var(--cyan); border-color: rgba(6, 182, 212, 0.3); font-family: var(--font-mono);"
+                  title="Verification OTPs are strictly sent to this registered address.">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Contact Mobile / WhatsApp *</label>
+                <input type="tel" id="biz-set-phone" class="form-control" placeholder="e.g. +94 77 123 4567" required>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 16px;">
+              <label class="form-label">Store Physical Address *</label>
+              <input type="text" id="biz-set-address" class="form-control"
+                placeholder="e.g. No 45, Galle Road, Colombo 03" required>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 16px;">
+              <label class="form-label">Printed Receipt Footer Message</label>
+              <input type="text" id="biz-set-footer" class="form-control"
+                placeholder="Thank You! Come Again! / ස්තූතියි! නැවත එන්න!">
+              <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">This custom note is printed at the
+                bottom of all customer receipts.</div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 24px;">
+              <label class="form-label">Store Logo URL / Image Source</label>
+              <div style="display: flex; gap: 14px; align-items: center;">
+                <input type="text" id="biz-set-logo" class="form-control" style="flex: 1;"
+                  placeholder="/assets/logo.png or https://..." oninput="updateLogoPreview()">
+                <div
+                  style="width: 50px; height: 50px; border-radius: 8px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0;">
+                  <img id="biz-set-logo-preview" src="/assets/logo.png" alt="Preview"
+                    style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+              <button type="submit" id="btn-save-biz-settings" class="btn btn-emerald btn-lg"
+                style="display: flex; align-items: center; gap: 8px;">
+                <span>💾 Save Profile Changes (Sends OTP)</span>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Danger Zone: Business Deletion -->
+        <div class="glass-panel"
+          style="padding: 24px 28px; border-color: rgba(239, 68, 68, 0.5); background: linear-gradient(180deg, rgba(239, 68, 68, 0.08) 0%, rgba(15, 23, 42, 0.8) 100%);">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <h3 style="font-size: 17px; font-weight: 800; color: #f87171; margin: 0;">⚠️ Danger Zone: Delete Store
+                  Account</h3>
+                <span class="badge"
+                  style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); font-size: 11px;">IRREVERSIBLE</span>
+              </div>
+              <p style="margin: 6px 0 0 0; font-size: 13px; color: #cbd5e1; max-width: 620px; line-height: 1.5;">
+                Permanently delete this business account and all associated catalog items, stock logs, invoices,
+                customer credit ledgers, and staff users. This action requires strict 6-digit email OTP verification
+                sent to the owner's email.
+              </p>
+            </div>
+            <button class="btn btn-danger btn-lg" onclick="initiateBusinessDeletion()"
+              style="display: flex; align-items: center; gap: 6px; box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);">
+              <span>🗑️ Delete This Business</span>
+            </button>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ========================================================================= -->
+      <!-- SECTION: TAB 8 - SUPPORT TICKET & HELP DESK                               -->
+      <!-- ========================================================================= -->
+      <section id="tab-support" class="pos-tab-section"
+        style="display: none; flex-direction: column; gap: 20px; max-width: 1080px; margin: 0 auto; width: 100%;">
+
+        <!-- Header -->
+        <div class="glass-panel" style="padding: 24px 28px; border-color: rgba(16, 185, 129, 0.35);">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <h2 style="font-size: 22px; font-weight: 800; color: #ffffff; margin: 0;">🎧 PrasaTek Technical Support
+                  Desk</h2>
+                <span class="badge badge-emerald">DIRECT EMAIL NOTIFICATIONS</span>
+              </div>
+              <p style="margin: 6px 0 0 0; font-size: 13px; color: var(--text-muted); line-height: 1.5;">
+                Submit an inquiry, report a technical problem, or request custom features. When our engineers reply, you
+                will receive an instant email notification at your registered store email.
+              </p>
+            </div>
+            <button class="btn btn-sm btn-glass" onclick="loadMerchantSupportTickets()"
+              style="display: flex; align-items: center; gap: 6px;">
+              <span>🔄 Refresh Tickets</span>
+            </button>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 20px; align-items: start;">
+          <!-- Left: New Ticket Submission -->
+          <div class="glass-panel" style="padding: 24px;">
+            <h3
+              style="font-size: 16px; font-weight: 700; color: #ffffff; margin: 0 0 14px 0; display: flex; align-items: center; gap: 8px;">
+              <span>📝 Open New Support Ticket</span>
+            </h3>
+            <form id="form-create-support-ticket" onsubmit="handleCreateSupportTicket(event)" autocomplete="off">
+              <div class="form-group" style="margin-bottom: 14px;">
+                <label class="form-label">Subject / Issue Category *</label>
+                <input type="text" id="support-ticket-subject" class="form-control"
+                  placeholder="e.g. Receipt printer connection error" required>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 18px;">
+                <label class="form-label">Message Details *</label>
+                <textarea id="support-ticket-message" class="form-control" rows="6"
+                  placeholder="Describe the issue, steps to reproduce, or assistance needed..." required
+                  style="resize: vertical; font-family: inherit; font-size: 13.5px;"></textarea>
+              </div>
+
+              <button type="submit" id="btn-submit-support-ticket" class="btn btn-cyan btn-lg"
+                style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <span>🚀 Submit Support Ticket</span>
+              </button>
+            </form>
+          </div>
+
+          <!-- Right: Ticket History & Admin Replies -->
+          <div class="glass-panel" style="padding: 24px; min-height: 380px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+              <h3
+                style="font-size: 16px; font-weight: 700; color: #ffffff; margin: 0; display: flex; align-items: center; gap: 8px;">
+                <span>📋 Your Support Inquiries</span>
+              </h3>
+              <span id="merchant-tickets-count-badge" class="badge badge-cyan" style="font-size: 11px;">0 Tickets</span>
+            </div>
+
+            <div id="merchant-support-tickets-list" style="display: flex; flex-direction: column; gap: 12px;">
+              <!-- Dynamically rendered by pos.js -->
+              <div style="text-align: center; padding: 40px; color: var(--text-dim); font-size: 13px;">
+                Loading your support tickets...
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
     </main>
   </div>
 
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: BUSINESS SETTINGS / DELETION OTP VERIFICATION (RESEND OTP)         -->
+  <!-- ========================================================================= -->
+  <div id="modal-biz-otp" class="modal-backdrop">
+    <div class="modal-card glass-panel" style="max-width: 440px; border-color: rgba(6, 182, 212, 0.45);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <h3 id="biz-otp-title" style="font-size: 18px; font-weight: 800; color: #ffffff; margin: 0;">🔐 Security
+            Verification</h3>
+          <span id="biz-otp-action-badge" class="badge badge-cyan" style="font-size: 10px;">PROFILE UPDATE</span>
+        </div>
+        <button class="btn btn-sm btn-glass" onclick="closeBizOtpModal()">✕</button>
+      </div>
+
+      <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 18px;">
+        A single-use 6-digit verification code has been dispatched via Resend to the registered owner email:
+        <br><strong id="biz-otp-target-email"
+          style="color: var(--cyan); font-family: var(--font-mono);">owner@store.lk</strong>
+      </p>
+
+      <form id="form-biz-otp" onsubmit="handleBizOtpSubmit(event)" autocomplete="off">
+        <div class="form-group" style="text-align: center; margin-bottom: 20px;">
+          <label class="form-label"
+            style="display: block; font-size: 12px; margin-bottom: 8px; color: var(--text-dim);">ENTER 6-DIGIT
+            CODE</label>
+          <input type="text" id="biz-otp-code" class="form-control" maxlength="6" placeholder="000000"
+            style="text-align: center; font-size: 32px; letter-spacing: 8px; font-family: var(--font-mono); font-weight: 800; color: #ffffff; padding: 12px;"
+            required>
+          <div style="font-size: 11px; color: var(--text-dim); margin-top: 6px;">⏱ Code expires in 10 minutes. Check
+            spam folder if delayed.</div>
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+          <button type="button" class="btn btn-glass" style="flex: 1;" onclick="closeBizOtpModal()">Cancel</button>
+          <button type="submit" id="btn-biz-otp-submit" class="btn btn-emerald btn-lg" style="flex: 1.6;">
+            Confirm &amp; Execute
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <!-- ========================================================================= -->
   <!-- MODAL: MASTER ADMIN - PROVISION NEW STORE ACCOUNT                         -->
@@ -2588,6 +3000,68 @@
 
 
   <!-- ========================================================================= -->
+  <!-- MODAL: MASTER ADMIN - REPLY TO SUPPORT TICKET (RESEND API EMAIL)           -->
+  <!-- ========================================================================= -->
+  <div id="modal-admin-reply-ticket" class="modal-backdrop">
+    <div class="modal-card glass-panel" style="max-width: 580px; border-color: rgba(16, 185, 129, 0.4);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <h3 style="font-size: 18px; font-weight: 800; color: #ffffff; margin: 0;">💬 Reply to Support Ticket</h3>
+          <span id="admin-reply-ticket-badge" class="badge badge-cyan">#00</span>
+        </div>
+        <button class="btn btn-sm btn-glass" onclick="closeAdminTicketReplyModal()">✕</button>
+      </div>
+
+      <!-- Ticket Metadata Summary -->
+      <div
+        style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-glass); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <div style="font-size: 14px; font-weight: 700; color: #ffffff;" id="admin-reply-ticket-subject">Subject</div>
+          <span id="admin-reply-ticket-status-badge" class="badge badge-warning">OPEN</span>
+        </div>
+        <div style="font-size: 12px; color: var(--text-dim); margin-bottom: 8px;">
+          From: <strong id="admin-reply-ticket-store" style="color: var(--cyan);">Store Name</strong> &bull;
+          Owner: <span id="admin-reply-ticket-owner">Owner</span> &bull;
+          Email: <span id="admin-reply-ticket-email" style="font-family: var(--font-mono);">email</span>
+        </div>
+        <div
+          style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">
+          Merchant Inquiry:</div>
+        <div id="admin-reply-ticket-message"
+          style="font-size: 13px; color: #cbd5e1; line-height: 1.5; white-space: pre-wrap; background: rgba(0,0,0,0.25); padding: 10px; border-radius: 6px;">
+        </div>
+      </div>
+
+      <form id="form-admin-reply-ticket" onsubmit="handleAdminSendTicketReply(event)" autocomplete="off">
+        <input type="hidden" id="admin-reply-ticket-id">
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label class="form-label">Official Support Reply (Will be emailed directly to owner) *</label>
+          <textarea id="admin-reply-text" class="form-control" rows="5"
+            placeholder="Type official technical response or resolution..." required
+            style="resize: vertical; font-family: inherit; font-size: 13.5px;"></textarea>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label class="form-label">Update Ticket Status</label>
+          <select id="admin-reply-status" class="form-control">
+            <option value="resolved" selected>✅ Mark as RESOLVED</option>
+            <option value="open">⏳ Keep OPEN (Awaiting further info)</option>
+          </select>
+        </div>
+
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+          <button type="button" class="btn btn-glass" onclick="closeAdminTicketReplyModal()">Cancel</button>
+          <button type="submit" id="btn-admin-submit-reply" class="btn btn-emerald btn-lg"
+            style="display: flex; align-items: center; gap: 8px;">
+            <span>🚀 Send Email Reply via Resend</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ========================================================================= -->
   <!-- MODAL: STAGE 1 - BUSINESS TERMINAL UNLOCK                                  -->
   <!-- ========================================================================= -->
   <div id="modal-unlock-biz" class="modal-backdrop">
@@ -2619,6 +3093,13 @@
         <button type="submit" class="btn btn-cyan btn-lg" style="width: 100%; margin-top: 10px;">
           🔓 Unlock Terminal
         </button>
+
+        <div style="text-align: center; margin-top: 14px; font-size: 12px;">
+          <a href="javascript:void(0)" onclick="closeUnlockBizModal(); openPublicSupportModal();"
+            style="color: var(--cyan); text-decoration: none; display: inline-flex; align-items: center; gap: 5px;">
+            <span>🎧</span> <span>Locked out or need assistance? Submit Support Ticket</span>
+          </a>
+        </div>
       </form>
     </div>
   </div>
@@ -3412,73 +3893,419 @@
 
 
   <!-- ========================================================================= -->
+  <!-- MODAL: PUBLIC SUPPORT TICKET (LANDING & LOGIN HELP)                       -->
+  <!-- ========================================================================= -->
+  <div id="modal-public-support" class="modal-backdrop">
+    <div class="modal-card glass-panel"
+      style="max-width: 520px; border-color: rgba(16, 185, 129, 0.45); padding: 24px;">
+      <div
+        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--border-glass); padding-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 26px;">🎧</span>
+          <div>
+            <h3 style="font-size: 18px; font-weight: 800; color: #ffffff; margin: 0;">Need Help? / Support Ticket</h3>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">Submit an inquiry to PrasaTek
+              Technical Support</div>
+          </div>
+        </div>
+        <button class="btn btn-sm btn-glass" onclick="closePublicSupportModal()">✕</button>
+      </div>
+
+      <form id="form-public-support" onsubmit="handlePublicSupportSubmit(event)" autocomplete="off">
+        <div class="form-group">
+          <label class="form-label" style="font-size: 12.5px; font-weight: 700;">
+            Registered Email Address <span style="color: var(--emerald);">* (Mandatory)</span>
+          </label>
+          <input type="email" id="public-ticket-email" class="form-control" placeholder="e.g. owner@yourbusiness.lk"
+            required>
+          <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">
+            Our support engineers will email replies directly to this registered address.
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label" style="font-size: 12px;">Your Name (Optional)</label>
+            <input type="text" id="public-ticket-name" class="form-control" placeholder="e.g. Nimal Perera">
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="font-size: 12px;">Business Code (If known)</label>
+            <input type="text" id="public-ticket-bizcode" class="form-control" placeholder="e.g. PT-00001"
+              style="text-transform: uppercase; font-family: var(--font-mono);">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" style="font-size: 12.5px; font-weight: 700;">
+            Subject <span style="color: var(--emerald);">*</span>
+          </label>
+          <input type="text" id="public-ticket-subject" class="form-control"
+            placeholder="e.g. Forgot Master Password / Printer Configuration" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" style="font-size: 12.5px; font-weight: 700;">
+            Message / Details <span style="color: var(--emerald);">*</span>
+          </label>
+          <textarea id="public-ticket-message" class="form-control" rows="4"
+            placeholder="Please describe your question or issue in detail..." required
+            style="resize: vertical;"></textarea>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 18px;">
+          <button type="button" class="btn btn-glass" style="flex: 1;"
+            onclick="closePublicSupportModal()">Cancel</button>
+          <button type="submit" id="btn-submit-public-ticket" class="btn btn-emerald btn-lg"
+            style="flex: 2; font-weight: 700;">
+            🚀 Submit Support Ticket
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: POS USERNAME DROPDOWN - CREATE SUPPORT TICKET                      -->
+  <!-- ========================================================================= -->
+  <div id="modal-pos-ticket" class="modal-backdrop">
+    <div class="modal-card glass-panel"
+      style="max-width: 540px; border-color: rgba(16, 185, 129, 0.45); padding: 24px;">
+      <div
+        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--border-glass); padding-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 26px;">🎧</span>
+          <div>
+            <h3 style="font-size: 18px; font-weight: 800; color: #ffffff; margin: 0;">Create Support Ticket</h3>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+              Store: <strong id="pos-ticket-modal-bizname" style="color: var(--cyan);">Supiri Mart</strong> (<code
+                id="pos-ticket-modal-bizcode" style="color: var(--emerald);">PT-DEMO</code>)
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-sm btn-glass" onclick="closePosSupportModal()">✕</button>
+      </div>
+
+      <form id="form-pos-modal-ticket" onsubmit="handlePosModalTicketSubmit(event)" autocomplete="off">
+        <div class="form-group">
+          <label class="form-label" style="font-size: 12.5px; font-weight: 700;">
+            Subject <span style="color: var(--emerald);">*</span>
+          </label>
+          <input type="text" id="pos-modal-ticket-subject" class="form-control"
+            placeholder="e.g. Need assistance with barcode label printing" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" style="font-size: 12.5px; font-weight: 700;">
+            Message / Details <span style="color: var(--emerald);">*</span>
+          </label>
+          <textarea id="pos-modal-ticket-message" class="form-control" rows="5"
+            placeholder="Describe the issue, station number, or guidance needed..." required
+            style="resize: vertical;"></textarea>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 18px;">
+          <button type="button" class="btn btn-glass" style="flex: 1;" onclick="closePosSupportModal()">Cancel</button>
+          <button type="submit" id="btn-submit-pos-modal-ticket" class="btn btn-emerald btn-lg"
+            style="flex: 2; font-weight: 700;">
+            🚀 Submit Ticket
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: POS USERNAME DROPDOWN - BUSINESS SETTINGS (RESEND OTP PROTECTED)   -->
+  <!-- ========================================================================= -->
+  <div id="modal-pos-settings" class="modal-backdrop">
+    <div class="modal-card glass-panel"
+      style="max-width: 620px; border-color: rgba(6, 182, 212, 0.45); padding: 24px; max-height: 90vh; overflow-y: auto;">
+      <div
+        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--border-glass); padding-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 26px;">⚙️</span>
+          <div>
+            <h3 style="font-size: 18px; font-weight: 800; color: #ffffff; margin: 0;">Business Profile &amp; Settings
+            </h3>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">Protected with Resend Email OTP
+              Verification</div>
+          </div>
+        </div>
+        <button class="btn btn-sm btn-glass" onclick="closeBusinessSettingsModal()">✕</button>
+      </div>
+
+      <div
+        style="background: rgba(6, 182, 212, 0.08); border: 1px solid rgba(6, 182, 212, 0.25); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 12px; color: #cbd5e1; display: flex; align-items: center; gap: 8px;">
+        <span>🔐</span>
+        <span>Saving changes requires a 6-digit verification code sent via Resend to the business owner's email.</span>
+      </div>
+
+      <form id="form-modal-settings" onsubmit="handleModalSettingsSubmit(event)" autocomplete="off">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label" style="font-size: 12px; font-weight: 700;">Store / Business Name *</label>
+            <input type="text" id="modal-set-name" class="form-control" required placeholder="e.g. Supiri Supermarket">
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="font-size: 12px; font-weight: 700;">Owner Full Name *</label>
+            <input type="text" id="modal-set-owner" class="form-control" required placeholder="e.g. Nimal Perera">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label" style="font-size: 12px;">Contact Phone</label>
+            <input type="tel" id="modal-set-phone" class="form-control" placeholder="+94771234567">
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="font-size: 12px;">Owner Registered Email</label>
+            <input type="email" id="modal-set-email" class="form-control" readonly
+              style="opacity: 0.75; cursor: not-allowed;" title="Registered owner email receives the Resend OTP">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" style="font-size: 12px;">Physical Store Address</label>
+          <input type="text" id="modal-set-address" class="form-control" placeholder="e.g. 123 Galle Road, Colombo 03">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" style="font-size: 12px;">Thermal Receipt Footer Note</label>
+          <input type="text" id="modal-set-footer" class="form-control"
+            placeholder="e.g. Thank you for shopping with us! Please come again.">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" style="font-size: 12px;">Store Receipt Logo</label>
+          <div style="display: flex; gap: 12px; align-items: center;">
+            <img id="modal-set-logo-preview" src="/assets/logo.png" alt="Logo Preview"
+              style="width: 52px; height: 52px; object-fit: contain; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid var(--border-glass); padding: 4px;">
+            <input type="file" id="modal-set-logo-file" accept="image/*" class="form-control"
+              onchange="previewModalLogo(this)">
+          </div>
+        </div>
+
+        <div
+          style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; border-top: 1px solid var(--border-glass); padding-top: 16px;">
+          <button type="button" class="btn btn-danger btn-sm"
+            onclick="closeBusinessSettingsModal(); switchPOSTab('settings');">
+            ⚠️ Open Danger Zone / Delete Store
+          </button>
+          <div style="display: flex; gap: 10px;">
+            <button type="button" class="btn btn-glass" onclick="closeBusinessSettingsModal()">Cancel</button>
+            <button type="submit" id="btn-save-modal-settings" class="btn btn-cyan font-bold">
+              💾 Save Profile &amp; Verify OTP
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ========================================================================= -->
   <!-- MODAL: BILINGUAL USER GUIDE (ENGLISH / සිංහල)                               -->
   <!-- ========================================================================= -->
   <div id="modal-user-guide" class="modal-backdrop">
-    <div class="modal-card glass-panel" style="max-width: 720px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <h3 style="font-size: 20px; font-weight: 800; color: #ffffff;">SupiriPOS PRO User Guide</h3>
-          <div style="display: flex; gap: 6px;">
-            <button id="guide-lang-en" class="btn btn-sm btn-cyan" onclick="switchGuideLang('en')">English</button>
-            <button id="guide-lang-si" class="btn btn-sm btn-glass" onclick="switchGuideLang('si')">සිංහල</button>
+    <div class="modal-card glass-panel" style="max-width: 860px; max-height: 88vh;">
+      <div
+        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--border-glass); padding-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <span style="font-size: 26px;">📖</span>
+          <div>
+            <h3 style="font-size: 20px; font-weight: 800; color: #ffffff; margin: 0;">SupiriPOS PRO User Guide &amp;
+              Documentation</h3>
+            <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">Comprehensive Manual &bull;
+              Powered by PrasaTek System Solutions</div>
           </div>
         </div>
-        <button class="btn btn-sm btn-glass" onclick="closeUserGuideModal()">✕</button>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div
+            style="display: flex; gap: 4px; background: rgba(0,0,0,0.3); padding: 3px; border-radius: 8px; border: 1px solid var(--border-glass);">
+            <button id="guide-lang-en" class="btn btn-sm btn-cyan" onclick="switchGuideLang('en')"
+              style="padding: 4px 10px; font-size: 12px;">English</button>
+            <button id="guide-lang-si" class="btn btn-sm btn-glass" onclick="switchGuideLang('si')"
+              style="padding: 4px 10px; font-size: 12px;">සිංහල</button>
+          </div>
+          <button class="btn btn-sm btn-glass" onclick="closeUserGuideModal()">✕</button>
+        </div>
       </div>
 
       <!-- English Guide Section -->
       <div id="guide-content-en"
-        style="font-size: 14px; line-height: 1.6; color: var(--text-muted); max-height: 65vh; overflow-y: auto; padding-right: 8px;">
-        <h4 style="color: var(--emerald); font-size: 16px; margin: 12px 0 6px 0;">1. 3 Landing Gateways</h4>
-        <p>• <strong>Launch Instant Demo Shop:</strong> 1-click test of pre-populated Colombo Supermarket
-          (<code>PT-DEMO</code>).<br>
-          • <strong>Register Business:</strong> 4-step wizard to register your shop, upload your receipt logo, and get
-          your unique Business Code (e.g. <code>PT-00001</code>).<br>
-          • <strong>Terminal Unlock:</strong> Locks this terminal station to your business code.</p>
+        style="font-size: 13.5px; line-height: 1.65; color: var(--text-muted); max-height: 70vh; overflow-y: auto; padding-right: 12px;">
 
-        <h4 style="color: var(--emerald); font-size: 16px; margin: 16px 0 6px 0;">2. Two-Stage Login Security</h4>
-        <p>• <strong>Stage 1 (Terminal Unlock):</strong> Business Code + Business Master Password.<br>
-          • <strong>Stage 2 (POS Staff Login):</strong> Default username <code>user</code>, password <code>123</code>.
-          Displays your shop logo and business badge.</p>
+        <div
+          style="background: rgba(16, 185, 129, 0.08); border-left: 3px solid var(--emerald); padding: 12px 16px; border-radius: 8px; margin-bottom: 16px;">
+          <strong style="color: #ffffff;">Welcome to SupiriPOS PRO!</strong>
+          <p style="margin: 4px 0 0 0; font-size: 12.5px; color: #cbd5e1;">A next-generation multi-tenant cloud Point of
+            Sale engineered for Sri Lankan supermarkets, grocery chains, bakeries, hardware shops, and retail stores
+            with real-time Supabase cloud synchronization and Resend email security.</p>
+        </div>
 
-        <h4 style="color: var(--emerald); font-size: 16px; margin: 16px 0 6px 0;">3. Fast Cashier Billing & Printing
+        <h4
+          style="color: var(--emerald); font-size: 15.5px; margin: 16px 0 6px 0; display: flex; align-items: center; gap: 8px;">
+          <span>1.</span> <span>Landing Gateways &amp; Terminal Login</span>
         </h4>
-        <p>• Scan barcodes with any USB/Bluetooth barcode scanner; pressing Enter automatically adds the item to the
-          active bill.<br>
-          • Use quick cash tender buttons (<code>+500</code>, <code>+1,000</code>, <code>+5,000</code>,
-          <code>Exact</code>) to instantly calculate Change Due (ඉතුරු මුදල).<br>
-          • Complete sale triggers thermal receipt print (80mm / 58mm) and deducts inventory in real time across all
-          counters.
-        </p>
+        <p>• <strong>Instant Live Demo:</strong> Test the pre-populated Colombo Supermarket (<code>PT-DEMO</code>) with
+          one click without registering.<br>
+          • <strong>Register Business:</strong> 4-step wizard to register your shop, configure receipt details, upload
+          your logo, and generate your permanent Business Code (e.g., <code>PT-00001</code>).<br>
+          • <strong>Terminal Unlock (Stage 1):</strong> Locks the workstation browser to your unique Business Code using
+          your Master Password.</p>
 
-        <h4 style="color: var(--emerald); font-size: 16px; margin: 16px 0 6px 0;">4. Real-Time Multi-Device Sync</h4>
-        <p>• Connected via WebSockets. When Cashier 1 makes a sale or adjusts stock, Counter 2 and Counter 3
-          automatically update without refreshing!</p>
+        <h4
+          style="color: var(--emerald); font-size: 15.5px; margin: 16px 0 6px 0; display: flex; align-items: center; gap: 8px;">
+          <span>2.</span> <span>Cashier Staff Login &amp; Mandatory First-Time Credential Change</span>
+        </h4>
+        <p>• <strong>Default Staff Account:</strong> New businesses start with initial credentials (Username:
+          <code>user</code>, Password: <code>123</code>).<br>
+          • <strong>Mandatory Credential Change:</strong> Upon first login, SupiriPOS automatically requires setting a
+          permanent username, secure password, and owner's full name. The temporary <code>user</code>/<code>123</code>
+          account is permanently disabled.<br>
+          • <strong>Granular Staff Permissions:</strong> Store managers can create cashier or accountant accounts with
+          restricted access to specific POS tabs (Billing, Inventory, Users, Reports).</p>
+
+        <h4
+          style="color: var(--emerald); font-size: 15.5px; margin: 16px 0 6px 0; display: flex; align-items: center; gap: 8px;">
+          <span>3.</span> <span>Fast Cashier Billing, Barcode Scanning &amp; Thermal Printing</span>
+        </h4>
+        <p>• <strong>Barcode Scanner Integration:</strong> Connect any USB or Bluetooth barcode scanner; scanned items
+          are automatically added to the active cart upon pressing Enter.<br>
+          • <strong>Cash Tender Hotkeys:</strong> Click quick cash buttons (<code>+500</code>, <code>+1,000</code>,
+          <code>+5,000</code>, <code>Exact</code>) to instantly calculate Change Due (ඉතුරු මුදල).<br>
+          • <strong>Thermal Receipt Printing:</strong> Instant 80mm and 58mm thermal receipts with custom shop logos,
+          itemized totals, discount notes, and Sinhala text support.<br>
+          • <strong>Real-Time WebSocket Sync:</strong> All terminal stations and registers share live inventory counts
+          and sales updates instantly without page reloading.</p>
+
+        <h4
+          style="color: var(--emerald); font-size: 15.5px; margin: 16px 0 6px 0; display: flex; align-items: center; gap: 8px;">
+          <span>4.</span> <span>Business Profile Management &amp; Resend Email OTP Security</span>
+        </h4>
+        <p>• <strong>Updating Store Details:</strong> Store name, physical address, contact phone, receipt footer, and
+          logo can be modified from either the <strong>⚙️ Settings</strong> tab or by clicking your
+          <strong>Username</strong> in the top header.<br>
+          • <strong>Resend Email OTP Verification:</strong> To protect against unauthorized changes, clicking "Save
+          Changes" generates an encrypted 6-digit OTP code sent directly to the registered business owner's email
+          address via the <strong>Resend HTTPS API</strong> (<code>noreply@prasatek.lk</code>).<br>
+          • <strong>Permanent Store Deletion (Danger Zone):</strong> Requires typed confirmation
+          (<code>DELETE &lt;BUSINESS_CODE&gt;</code>) plus an explicit Resend deletion OTP code to prevent accidental
+          data loss.</p>
+
+        <h4
+          style="color: var(--emerald); font-size: 15.5px; margin: 16px 0 6px 0; display: flex; align-items: center; gap: 8px;">
+          <span>5.</span> <span>Support Ticket System (POS Dropdown &amp; Public Landing Page)</span>
+        </h4>
+        <p>• <strong>From Inside the POS:</strong> Click on your <strong>Username</strong> in the top header and select
+          <strong>"🎧 Create Support Ticket"</strong>. Pre-fills your store code and submits your technical query
+          immediately.<br>
+          • <strong>From the Public Landing Page:</strong> Anyone or locked-out merchants can click <strong>"🎧 Need
+            Help? / Support"</strong> on the landing page or terminal unlock screen and submit a ticket using their
+          <strong>Registered Email Address</strong>.<br>
+          • <strong>Direct Email Confirmation &amp; Replies:</strong> You receive an instant confirmation email via
+          Resend. When PrasaTek technical engineers reply from the Master Admin Panel, the response is delivered
+          straight to your email inbox!</p>
+
+        <h4
+          style="color: var(--emerald); font-size: 15.5px; margin: 16px 0 6px 0; display: flex; align-items: center; gap: 8px;">
+          <span>6.</span> <span>Stealth Master Admin Backdoor &amp; System Administration</span>
+        </h4>
+        <p>• <strong>Hidden Super Admin Access:</strong> Entering <code>admin@prasatek.lk</code> (default password:
+          <code>PrasaTek@2026</code>) into the standard Terminal Login form opens the <strong>Master Admin Control
+            Panel</strong>.<br>
+          • <strong>Dynamic Database Sync:</strong> Login credentials dynamically query PostgreSQL in Supabase on every
+          attempt with no hardcoded fallbacks.<br>
+          • <strong>Platform Governance:</strong> Master Admin can view all registered businesses, provision new stores,
+          suspend/activate accounts, review support tickets, and email official replies.</p>
       </div>
 
       <!-- Sinhala Guide Section -->
       <div id="guide-content-si"
-        style="display: none; font-size: 14px; line-height: 1.8; color: var(--text-muted); max-height: 65vh; overflow-y: auto; padding-right: 8px;">
-        <h4 style="color: var(--cyan); font-size: 16px; margin: 12px 0 6px 0;">1. පද්ධතියට පිවිසීමේ ක්‍රම 3</h4>
-        <p>• <strong>Live Demo මඟින් පරීක්ෂා කිරීම:</strong> ලියාපදිංචි නොවී තත්පරයකින් <code>PT-DEMO</code> සුපිරි
-          වෙළඳසැලට පිවිස බිල්පත් නිකුත් කිරීම සහ වාර්තා බලන්න.<br>
-          • <strong>නව ව්‍යාපාරයක් ලියාපදිංචි කිරීම:</strong> පියවර 4 කින් ඔබේ ව්‍යාපාරය ඇතුළත් කර අද්විතීය ව්‍යාපාර
-          කේතය (<code>PT-00001</code>) ලබා ගන්න.<br>
-          • <strong>ව්‍යාපාරයට පිවිසීම (Terminal Unlock):</strong> ඔබේ ව්‍යාපාර කේතය සහ මුරපදය මඟින් පරිගණකය ලොක්
-          කරගන්න.</p>
+        style="display: none; font-size: 13.5px; line-height: 1.8; color: var(--text-muted); max-height: 70vh; overflow-y: auto; padding-right: 12px;">
 
-        <h4 style="color: var(--cyan); font-size: 16px; margin: 16px 0 6px 0;">2. මුදල් අයකැමි පිවිසුම (Staff Login)
+        <div
+          style="background: rgba(6, 182, 212, 0.08); border-left: 3px solid var(--cyan); padding: 12px 16px; border-radius: 8px; margin-bottom: 16px;">
+          <strong style="color: #ffffff;">SupiriPOS PRO වෙත සාදරයෙන් පිළිගනිමු!</strong>
+          <p style="margin: 4px 0 0 0; font-size: 12.5px; color: #cbd5e1;">ශ්‍රී ලාංකික සුපිරි වෙළඳසැල්, සිල්ලර කඩ,
+            බේකරි සහ ව්‍යාපාර සඳහා නිර්මාණය කරන ලද නවීනතම Cloud Point of Sale පද්ධතිය. Supabase Cloud දත්ත ගබඩාව සහ
+            Resend Email ආරක්ෂණය සමඟ ක්‍රියාත්මක වේ.</p>
+        </div>
+
+        <h4
+          style="color: var(--cyan); font-size: 15.5px; margin: 16px 0 6px 0; display: flex; align-items: center; gap: 8px;">
+          <span>1.</span> <span>පද්ධතියට පිවිසීමේ ද්වාර සහ ටර්මිනල් අගුළු ඇරීම (Terminal Unlock)</span>
         </h4>
-        <p>• ඔබේ ව්‍යාපාරය ලියාපදිංචි කළ පසු ප්‍රධාන මුදල් අයකැමි පිවිසුම වන්නේ <strong>Username:
-            <code>user</code></strong> සහ <strong>Password: <code>123</code></strong> වේ.<br>
-          • ඔබගේ කාර්ය මණ්ඩලයට අවශ්‍ය පරිදි වෙනම Cashier ගිණුම් සාදා ඔවුන්ට අදාළ පිටු පමණක් ලබා දිය හැක.</p>
+        <p>• <strong>ක්ෂණික Live Demo පරීක්ෂාව:</strong> ලියාපදිංචි නොවී තත්පරයකින් <code>PT-DEMO</code> සුපිරි වෙළඳසැලට
+          පිවිස බිල්පත් සහ වාර්තා පරික්ෂා කළ හැක.<br>
+          • <strong>නව ව්‍යාපාරයක් ලියාපදිංචි කිරීම:</strong> පියවර 4කින් ඔබේ ව්‍යාපාර නම, ලිපිනය සහ ලාංඡනය (Logo)
+          ඇතුළත් කර ස්ථිර ව්‍යාපාර කේතය (<code>PT-00001</code>) ලබා ගන්න.<br>
+          • <strong>ටර්මිනල් අගුළු ඇරීම (Terminal Unlock):</strong> ඔබේ ව්‍යාපාර කේතය සහ ප්‍රධාන මුරපදය (Master
+          Password) මඟින් පරිගණකය ලොක් කරගන්න.</p>
 
-        <h4 style="color: var(--cyan); font-size: 16px; margin: 16px 0 6px 0;">3. බිල්පත් මුද්‍රණය සහ තොග කළමනාකරණය</h4>
-        <p>• Barcode ස්කෑන් කළ සැණින් භාණ්ඩ බිලට එක් වේ. මුදල් ලැබුණු පසු ඉතුරු මුදල පැහැදිලිව පෙන්වයි.<br>
-          • 80mm සහ 58mm Thermal මුද්‍රණ යන්ත්‍ර මඟින් සිංහල අකුරු සහිත අලංකාර බිල්පතක් ක්ෂණිකව මුද්‍රණය වේ.<br>
-          • කවුන්ටර කිහිපයකින් එකවර බිල් දැමුවද WebSockets හරහා සියලු තොග තොරතුරු ක්ෂණිකව සමමුහුර්ත (Real-Time Sync) වේ.
-        </p>
+        <h4
+          style="color: var(--cyan); font-size: 15.5px; margin: 16px 0 6px 0; display: flex; align-items: center; gap: 8px;">
+          <span>2.</span> <span>මුදල් අයකැමි පිවිසුම සහ අනිවාර්ය පළමු පිවිසුම් මුරපද වෙනස් කිරීම</span>
+        </h4>
+        <p>• <strong>ප්‍රාරම්භක පිවිසුම් ගිණුම:</strong> නව ව්‍යාපාර සඳහා පෙරනිමි පිවිසුම වන්නේ <strong>Username:
+            <code>user</code></strong> සහ <strong>Password: <code>123</code></strong> වේ.<br>
+          • <strong>පළමු පිවිසුමේදීම මුරපදය වෙනස් කිරීම:</strong> පද්ධතියේ ආරක්ෂාව උදෙසා පළමු පිවිසුමේදීම නව Username සහ
+          ශක්තිමත් මුරපදයක් ඇතුළත් කළ යුතු අතර, පැරණි <code>user</code>/<code>123</code> ගිණුම ස්වයංක්‍රීයව අක්‍රිය
+          වේ.<br>
+          • <strong>කාර්ය මණ්ඩල අවසර කළමනාකරණය:</strong> මුදල් අයකැමියන්ට බිල්පත් පමණක් නිකුත් කිරීමට සහ තොග/වාර්තා පිටු
+          සීමා කිරීමට Staff ටැබය මඟින් හැක.</p>
+
+        <h4
+          style="color: var(--cyan); font-size: 15.5px; margin: 16px 0 6px 0; display: flex; align-items: center; gap: 8px;">
+          <span>3.</span> <span>වේගවත් බිල්පත් නිකුත් කිරීම, තීරු කේත ස්කෑන් සහ තාප මුද්‍රණය (Billing &amp;
+            Printing)</span>
+        </h4>
+        <p>• <strong>Barcode ස්කෑන් කිරීම:</strong> ඕනෑම USB හෝ Bluetooth Barcode ස්කෑනරයක් මඟින් භාණ්ඩ ස්කෑන් කළ සැණින්
+          බිලට එක් වේ.<br>
+          • <strong>ඉතුරු මුදල් ක්ෂණිකව ගණනය:</strong> <code>+500</code>, <code>+1,000</code>, <code>+5,000</code>,
+          <code>Exact</code> බොත්තම් මඟින් පාරිභෝගිකයාට ලබා දිය යුතු ඉතුරු මුදල (Change Due) ක්ෂණිකව පෙන්වයි.<br>
+          • <strong>Thermal බිල්පත් මුද්‍රණය:</strong> 80mm සහ 58mm තාප මුද්‍රණ යන්ත්‍ර මඟින් සිංහල අකුරු සහිත අලංකාර
+          බිල්පතක් ඔබේ වෙළඳසැල් ලාංඡනය සමඟ ක්ෂණිකව මුද්‍රණය වේ.<br>
+          • <strong>Real-Time WebSockets Sync:</strong> කවුන්ටර කිහිපයකින් එකවර බිල් දැමුවද සියලු තොග තොරතුරු Refresh
+          කිරීමකින් තොරව ස්වයංක්‍රීයව සමමුහුර්ත වේ.</p>
+
+        <h4
+          style="color: var(--cyan); font-size: 15.5px; margin: 16px 0 6px 0; display: flex; align-items: center; gap: 8px;">
+          <span>4.</span> <span>ව්‍යාපාරික සැකසුම් සහ Resend Email OTP ආරක්ෂණ ක්‍රමය</span>
+        </h4>
+        <p>• <strong>වෙළඳසැල් තොරතුරු යාවත්කාලීන කිරීම:</strong> වෙළඳසැලේ නම, ලිපිනය, දුරකථන අංකය, බිල්පත් පාඨය (Footer)
+          සහ Logo <strong>⚙️ Settings</strong> ටැබයෙන් හෝ ඉහළ Username Dropdown මෙනුවෙන් සංස්කරණය කළ හැක.<br>
+          • <strong>Email OTP තහවුරු කිරීම:</strong> අනවසර වෙනස්කම් වැළැක්වීමට, වෙනස්කම් සුරැකීමේදී හිමිකරුගේ ලියාපදිංචි
+          ඊමේල් ලිපිනයට <strong>Resend API</strong> (<code>noreply@prasatek.lk</code>) හරහා ඉලක්කම් 6ක OTP ආරක්ෂණ කේතයක්
+          ලැබෙන අතර, එය ඇතුළත් කළ පසු පමණක් දත්ත ගබඩාව යාවත්කාලීන වේ.<br>
+          • <strong>ව්‍යාපාරය මකා දැමීම (Danger Zone):</strong> ස්ථිරවම මකා දැමීමට නම්
+          <code>DELETE &lt;BUSINESS_CODE&gt;</code> යතුරුලියනය කර දෙවන Resend OTP කේතය තහවුරු කළ යුතුය.</p>
+
+        <h4
+          style="color: var(--cyan); font-size: 15.5px; margin: 16px 0 6px 0; display: flex; align-items: center; gap: 8px;">
+          <span>5.</span> <span>තාක්ෂණික සහාය ටිකට්පත් පද්ධතිය (Support Ticket System)</span>
+        </h4>
+        <p>• <strong>POS පද්ධතිය තුළින්:</strong> ඉහළ දකුණු කෙළවරේ ඇති ඔබගේ <strong>Username</strong> මත ක්ලික් කර
+          <strong>"🎧 Create Support Ticket"</strong> තෝරා ගැටලුව ඇතුළත් කරන්න.<br>
+          • <strong>ප්‍රධාන Landing පිටුවෙන්:</strong> පද්ධතියට ලොග් වීමට නොහැකි වූ විට Landing පිටුවේ හෝ Unlock කවුළුවේ
+          ඇති <strong>"🎧 Need Help? / Support"</strong> බොත්තම ක්ලික් කර ඔබගේ <strong>ලියාපදිංචි ඊමේල් ලිපිනය</strong>
+          ලබා දී ටිකට්පතක් ඉදිරිපත් කළ හැක.<br>
+          • <strong>ක්ෂණික ඊමේල් පිළිතුරු:</strong> ටිකට්පත ලැබුණු බවට Resend හරහා ඔබට තහවුරු කිරීමේ ඊමේලයක් ලැබෙන අතර,
+          PrasaTek ඉංජිනේරුවන් ලබා දෙන නිල පිළිතුර කෙලින්ම ඔබගේ ඊමේල් Inbox එකටම ලැබේ!</p>
+
+        <h4
+          style="color: var(--cyan); font-size: 15.5px; margin: 16px 0 6px 0; display: flex; align-items: center; gap: 8px;">
+          <span>6.</span> <span>ප්‍රධාන පරිපාලක රහස් පිවිසුම (Master Admin Stealth Backdoor)</span>
+        </h4>
+        <p>• <strong>රහස් පරිපාලක පිවිසුම:</strong> සාමාන්‍ය Terminal Login පෝරමයේ Username ලෙස
+          <code>admin@prasatek.lk</code> (මුරපදය: <code>PrasaTek@2026</code>) ඇතුළත් කළ විට <strong>Master Admin Control
+            Panel</strong> එක විවෘත වේ.<br>
+          • <strong>සජීවී දත්ත ගබඩා සත්‍යාපනය:</strong> සෑම පිවිසුමකදීම Supabase දත්ත ගබඩාව සජීවීව පරීක්ෂා කෙරෙන අතර,
+          කිසිදු Hardcoded Fallback එකක් නොමැත.<br>
+          • <strong>සමස්ත පද්ධති කළමනාකරණය:</strong> සියලු වෙළඳසැල් නිරීක්ෂණය, ගිණුම් අත්හිටුවීම/සක්‍රිය කිරීම, මුරපද
+          Reset කිරීම සහ පාරිභෝගික Support ටිකට්පත් වලට පිළිතුරු යැවීම මෙහිදී සිදු කළ හැක.</p>
       </div>
     </div>
   </div>
@@ -3487,7 +4314,7 @@
   <div id="printable-receipt-container"></div>
 
   <!-- Main POS Client-Side Controller -->
-  <script src="/assets/pos.js?v=20261115_master_admin"></script>
+  <script src="/assets/pos.js?v=20261117_tickets_dropdown"></script>
 </body>
 
 </html>

@@ -301,6 +301,22 @@ class CreditLedger(Base):
     staff_user = Column(String(100), default="Admin")
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
+class SupportTicket(Base):
+    __tablename__ = "support_tickets"
+    id = Column(Integer, primary_key=True, index=True)
+    business_id = Column(Integer, nullable=True, index=True)
+    business_code = Column(String(30), index=True, nullable=False)
+    business_name = Column(String(150), nullable=True)
+    owner_email = Column(String(150), nullable=True)
+    owner_name = Column(String(150), nullable=True)
+    subject = Column(String(250), nullable=False)
+    message = Column(Text, nullable=False)
+    status = Column(String(30), default="open", index=True)  # open, resolved
+    admin_reply = Column(Text, nullable=True)
+    replied_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
 # Create tables & perform safe migrations
 try:
     Base.metadata.create_all(bind=engine)
@@ -886,11 +902,43 @@ class UserCreateUpdateRequest(BaseModel):
 
 class ChangeInitialCredentialsRequest(BaseModel):
     business_code: str
-    current_username: str
-    current_password: str
+    user_id: Optional[int] = None
+    current_username: Optional[str] = "user"
+    current_password: Optional[str] = "123"
     new_username: str
     new_password: str
     new_full_name: Optional[str] = None
+    full_name: Optional[str] = None
+
+class BusinessRequestOTPRequest(BaseModel):
+    business_code: str
+    action: str = "UPDATE_SETTINGS"  # "UPDATE_SETTINGS" or "DELETE_BUSINESS"
+
+class BusinessUpdateSettingsRequest(BaseModel):
+    business_code: str
+    otp_code: str
+    name: str
+    owner_name: Optional[str] = None
+    phone: str
+    address: str
+    receipt_footer: Optional[str] = None
+    logo_base64: Optional[str] = None
+
+class BusinessDeleteRequest(BaseModel):
+    business_code: str
+    otp_code: str
+
+class SupportTicketCreateRequest(BaseModel):
+    business_code: Optional[str] = None
+    email: Optional[str] = None
+    name: Optional[str] = None
+    subject: str
+    message: str
+
+class AdminTicketReplyRequest(BaseModel):
+    reply_message: Optional[str] = None
+    reply: Optional[str] = None
+    status: Optional[str] = "resolved"
 
 class LogoutRequest(BaseModel):
     business_code: str
@@ -1464,42 +1512,31 @@ def universal_login(req: StealthLoginRequest, db: Session = Depends(get_db)):
             POSUser.username == raw_user.lower()
         ).first()
         if user and verify_password(req.password, user.password_hash):
+            log_activity(db, user.business_code, user.username, "LOGIN", f"Staff login from terminal as {user.role_title}")
+            must_change = getattr(user, "must_change_password", False)
             return {
                 "status": "success",
                 "success": True,
                 "role": "pos_user",
+                "must_change_password": must_change,
                 "user": {
                     "id": user.id,
                     "business_code": user.business_code,
                     "username": user.username,
                     "full_name": user.full_name,
                     "role_title": user.role_title,
-                    "must_change_password": getattr(user, "must_change_password", False)
+                    "must_change_password": must_change,
+                    "permissions": {
+                        "billing": user.can_billing,
+                        "items": user.can_items,
+                        "stock": user.can_stock,
+                        "users": user.can_users,
+                        "reports": user.can_reports
+                    }
                 }
             }
 
     raise HTTPException(status_code=401, detail="Invalid username or password.")
-
-    log_activity(db, user.business_code, user.username, "LOGIN", f"Staff login from terminal as {user.role_title}")
-
-    return {
-        "success": True,
-        "user": {
-            "id": user.id,
-            "business_code": user.business_code,
-            "username": user.username,
-            "full_name": user.full_name,
-            "role_title": user.role_title,
-            "must_change_password": getattr(user, "must_change_password", False),
-            "permissions": {
-                "billing": user.can_billing,
-                "items": user.can_items,
-                "stock": user.can_stock,
-                "users": user.can_users,
-                "reports": user.can_reports
-            }
-        }
-    }
 
 @app.post("/api/auth/pos-logout")
 def pos_logout(req: LogoutRequest, db: Session = Depends(get_db)):
@@ -1511,15 +1548,34 @@ def pos_logout(req: LogoutRequest, db: Session = Depends(get_db)):
 def change_initial_credentials(req: ChangeInitialCredentialsRequest, db: Session = Depends(get_db)):
     """Forces first-time password & username change for default user/123 admin account"""
     code_clean = req.business_code.strip().upper()
-    curr_user_clean = req.current_username.strip().lower()
+    curr_user_clean = (req.current_username or "user").strip().lower()
     new_user_clean = req.new_username.strip().lower()
 
-    user = db.query(POSUser).filter(
-        POSUser.business_code == code_clean,
-        POSUser.username == curr_user_clean
-    ).first()
+    user = None
+    if req.user_id:
+        user = db.query(POSUser).filter(
+            POSUser.id == req.user_id,
+            POSUser.business_code == code_clean
+        ).first()
 
-    if not user or not verify_password(req.current_password, user.password_hash):
+    if not user:
+        user = db.query(POSUser).filter(
+            POSUser.business_code == code_clean,
+            func.lower(POSUser.username) == curr_user_clean
+        ).first()
+
+    if not user:
+        # Fallback: look for initial user flagged with must_change_password
+        user = db.query(POSUser).filter(
+            POSUser.business_code == code_clean,
+            POSUser.must_change_password == True
+        ).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Staff account not found in this business.")
+
+    curr_pass = req.current_password or "123"
+    if not verify_password(curr_pass, user.password_hash) and not getattr(user, "must_change_password", False):
         raise HTTPException(status_code=401, detail="Current credentials could not be verified.")
 
     if not new_user_clean or len(new_user_clean) < 3:
@@ -1528,18 +1584,21 @@ def change_initial_credentials(req: ChangeInitialCredentialsRequest, db: Session
     if not req.new_password or len(req.new_password) < 4:
         raise HTTPException(status_code=400, detail="New password must be at least 4 characters.")
 
-    if new_user_clean != curr_user_clean:
+    if new_user_clean != user.username.lower():
         existing = db.query(POSUser).filter(
             POSUser.business_code == code_clean,
-            POSUser.username == new_user_clean
+            func.lower(POSUser.username) == new_user_clean,
+            POSUser.id != user.id
         ).first()
         if existing:
             raise HTTPException(status_code=400, detail=f"Username '{new_user_clean}' is already in use by another staff user.")
 
     user.username = new_user_clean
     user.password_hash = hash_password(req.new_password)
-    if req.new_full_name and req.new_full_name.strip():
-        user.full_name = req.new_full_name.strip()
+    
+    name_to_set = req.new_full_name or req.full_name
+    if name_to_set and name_to_set.strip():
+        user.full_name = name_to_set.strip()
     user.must_change_password = False
     db.commit()
     db.refresh(user)
@@ -2958,6 +3017,8 @@ def admin_overview_stats(admin: SystemAdmin = Depends(get_current_admin), db: Se
     total_products = db.query(Item).count()
     total_invoices = db.query(Invoice).count()
     total_revenue = db.query(func.sum(Invoice.grand_total)).filter(Invoice.status == "PAID").scalar() or 0.0
+    open_tickets = db.query(SupportTicket).filter(SupportTicket.status == "open").count()
+    total_tickets = db.query(SupportTicket).count()
 
     return {
         "success": True,
@@ -2969,6 +3030,8 @@ def admin_overview_stats(admin: SystemAdmin = Depends(get_current_admin), db: Se
         "total_products": total_products,
         "total_invoices": total_invoices,
         "total_revenue": round(float(total_revenue), 2),
+        "open_support_tickets": open_tickets,
+        "total_support_tickets": total_tickets,
         "stats": {
             "total_businesses": total_biz,
             "active_businesses": active_biz,
@@ -2976,7 +3039,9 @@ def admin_overview_stats(admin: SystemAdmin = Depends(get_current_admin), db: Se
             "total_users": total_users,
             "total_products": total_products,
             "total_invoices": total_invoices,
-            "total_revenue": round(float(total_revenue), 2)
+            "total_revenue": round(float(total_revenue), 2),
+            "open_support_tickets": open_tickets,
+            "total_support_tickets": total_tickets
         }
     }
 
@@ -3060,7 +3125,7 @@ def admin_create_business(req: AdminCreateBusinessRequest, admin: SystemAdmin = 
         can_stock=True,
         can_users=True,
         can_reports=True,
-        must_change_password=False
+        must_change_password=(term_user == "user" and term_pass == "123")
     )
     db.add(user)
     db.commit()
@@ -3150,6 +3215,7 @@ def admin_delete_business(business_id: int, admin: SystemAdmin = Depends(get_cur
     db.query(CreditCustomer).filter(CreditCustomer.business_code == code).delete(synchronize_session=False)
     db.query(ActivityLog).filter(ActivityLog.business_code == code).delete(synchronize_session=False)
     db.query(POSUser).filter(POSUser.business_code == code).delete(synchronize_session=False)
+    db.query(SupportTicket).filter(SupportTicket.business_code == code).delete(synchronize_session=False)
     db.delete(biz)
     db.commit()
 
@@ -3162,37 +3228,523 @@ def admin_delete_business(business_id: int, admin: SystemAdmin = Depends(get_cur
 
 @app.put("/api/admin/profile")
 def admin_update_profile(req: AdminProfileUpdateRequest, admin: SystemAdmin = Depends(get_current_admin), db: Session = Depends(get_db)):
-    """Update Super Admin's own email and password (persisted to system_admins)"""
+    """Update Super Admin's own email and password (persisted to system_admins in Supabase)"""
     if not verify_password(req.current_password, admin.password_hash):
         raise HTTPException(status_code=400, detail="Current password incorrect.")
+
+    db_admin = db.query(SystemAdmin).filter(SystemAdmin.id == admin.id).first()
+    if not db_admin:
+        raise HTTPException(status_code=404, detail="Admin record not found.")
 
     if req.new_email and req.new_email.strip():
         clean_email = req.new_email.strip().lower()
         existing = db.query(SystemAdmin).filter(
             func.lower(SystemAdmin.admin_email) == clean_email,
-            SystemAdmin.id != admin.id
+            SystemAdmin.id != db_admin.id
         ).first()
         if existing:
             raise HTTPException(status_code=400, detail="This email is already registered as an admin.")
-        admin.admin_email = clean_email
+        db_admin.admin_email = clean_email
 
     if req.new_password and req.new_password.strip():
         if len(req.new_password.strip()) < 8:
             raise HTTPException(status_code=400, detail="New password must be at least 8 characters.")
-        admin.password_hash = hash_password(req.new_password.strip())
+        db_admin.password_hash = hash_password(req.new_password.strip())
 
-    admin.updated_at = datetime.now(timezone.utc)
+    db_admin.updated_at = datetime.now(timezone.utc)
     db.commit()
-    db.refresh(admin)
+    db.refresh(db_admin)
 
-    new_token = generate_admin_token(admin.admin_email)
-    logger.info(f"[ADMIN PROFILE] Super Admin credentials updated: {admin.admin_email}")
+    new_token = generate_admin_token(db_admin.admin_email)
+    logger.info(f"[ADMIN PROFILE] Super Admin credentials updated in Supabase: {db_admin.admin_email}")
 
     return {
         "success": True,
-        "message": "Super Admin credentials updated successfully.",
-        "admin_email": admin.admin_email,
+        "message": "Super Admin credentials updated successfully in Supabase.",
+        "admin_email": db_admin.admin_email,
         "token": new_token
+    }
+
+# ---------------------------------------------------------------------------
+# Business Profile Management & Deletion with Resend OTP Verification
+# ---------------------------------------------------------------------------
+@app.post("/api/business/request-otp")
+def business_request_otp(req: BusinessRequestOTPRequest, db: Session = Depends(get_db)):
+    """
+    Sends a 6-digit OTP verification code via Resend HTTPS API to the business owner's
+    registered email address for Profile Update or Deletion.
+    """
+    code_clean = req.business_code.strip().upper()
+    biz = db.query(Business).filter(Business.business_code == code_clean).first()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Business not found.")
+
+    if not biz.email:
+        raise HTTPException(status_code=400, detail="This business has no registered email on file.")
+
+    otp = f"{random.randint(100000, 999999)}"
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+
+    otp_record = OTPVerification(
+        email=biz.email.lower().strip(),
+        otp_code=otp,
+        expires_at=expires_at,
+        is_verified=False
+    )
+    db.add(otp_record)
+    db.commit()
+
+    is_delete = (req.action.upper() == "DELETE_BUSINESS")
+    action_label = "Permanent Store Account Deletion" if is_delete else "Store Profile & Settings Update"
+    subject = f"⚠️ SECURITY CODE: {action_label} - {otp}" if is_delete else f"SupiriPOS PRO: Verification Code for {action_label} - {otp}"
+    warning_text = (
+        "<b>CRITICAL WARNING:</b> Entering this code will permanently delete your store and ALL associated data (sales, items, customers, invoices) with zero recovery!"
+        if is_delete else
+        "This code will authorize changes to your store profile and business settings."
+    )
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="margin: 0; padding: 25px 15px; background-color: #0b1120; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #f8fafc;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 540px; margin: 0 auto; background-color: #0f172a; border-radius: 14px; border: 1px solid #1e293b; padding: 28px;">
+            <tr>
+                <td>
+                    <div style="margin-bottom: 4px;">
+                        <span style="font-size: 22px; font-weight: 800; color: #10b981;">SupiriPOS <span style="color: #38bdf8;">PRO</span></span>
+                    </div>
+                    <p style="margin: 0 0 16px 0; font-size: 12px; color: #94a3b8;">Next-Gen Cloud Point of Sale System</p>
+                    <div style="height: 1px; width: 100%; background: #1e293b; margin-bottom: 20px;"></div>
+
+                    <h2 style="margin: 0 0 10px 0; color: {'#ef4444' if is_delete else '#10b981'}; font-size: 20px;">
+                        {'⚠️ Store Deletion Authorization' if is_delete else '🔐 Store Settings Verification'}
+                    </h2>
+                    <p style="font-size: 14px; line-height: 1.5; color: #cbd5e1;">
+                        Hello <strong>{biz.owner_name}</strong> ({biz.name} &bull; <code style="color: #38bdf8;">{biz.business_code}</code>),<br>
+                        A security request was initiated for <strong>{action_label}</strong>.<br><br>
+                        {warning_text}
+                    </p>
+                    <div style="background: #1e293b; border: 2px dashed {'#ef4444' if is_delete else '#10b981'}; border-radius: 10px; padding: 18px; text-align: center; margin: 20px 0;">
+                        <span style="font-size: 11px; text-transform: uppercase; color: #94a3b8; font-weight: 700; display: block; margin-bottom: 4px;">Security Verification Code</span>
+                        <div style="font-size: 38px; font-weight: 800; letter-spacing: 8px; color: #ffffff; font-family: monospace;">{otp}</div>
+                        <p style="margin: 4px 0 0 0; font-size: 11px; color: #94a3b8;">Expires in 10 minutes. Never share this code.</p>
+                    </div>
+                    <p style="font-size: 12px; color: #64748b; line-height: 1.5;">
+                        If you did not initiate this request, please change your Master Password immediately and contact PrasaTek Support.
+                    </p>
+                    <div style="border-top: 1px solid #1e293b; padding-top: 16px; margin-top: 20px; text-align: center;">
+                        <p style="margin: 0; font-size: 12px; font-weight: 700; color: #f1f5f9;">PrasaTek System Solutions</p>
+                        <p style="margin: 3px 0 0 0; font-size: 11px; color: #64748b;">Enterprise Software &amp; Smart Cloud Solutions &bull; Sri Lanka</p>
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
+
+    send_email_in_background(
+        to_email=biz.email.lower().strip(),
+        subject=subject,
+        html_content=html_content,
+        plain_text=f"SupiriPOS PRO Security Code: {otp}\nAction: {action_label}\nStore: {biz.name} ({biz.business_code})\nExpires in 10 minutes.",
+        context_label="BIZ-OTP"
+    )
+
+    masked_email = biz.email
+    if "@" in biz.email:
+        parts = biz.email.split("@")
+        u = parts[0]
+        masked_email = (u[:2] + "***" + u[-1:] if len(u) > 3 else u[:1] + "***") + "@" + parts[1]
+
+    return {
+        "success": True,
+        "message": f"Verification code sent to {masked_email}",
+        "masked_email": masked_email
+    }
+
+@app.post("/api/business/update-settings")
+def business_update_settings(req: BusinessUpdateSettingsRequest, db: Session = Depends(get_db)):
+    """
+    Applies store settings updates only upon valid 6-digit email OTP verification.
+    """
+    code_clean = req.business_code.strip().upper()
+    biz = db.query(Business).filter(Business.business_code == code_clean).first()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Business not found.")
+
+    otp_clean = req.otp_code.strip()
+    record = db.query(OTPVerification).filter(
+        OTPVerification.email == biz.email.lower().strip(),
+        OTPVerification.otp_code == otp_clean,
+        OTPVerification.is_verified == False
+    ).order_by(desc(OTPVerification.created_at)).first()
+
+    if not record:
+        raise HTTPException(status_code=400, detail="Invalid OTP verification code. Please check and try again.")
+
+    now = datetime.now(timezone.utc)
+    exp = record.expires_at
+    if exp.tzinfo is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+    if now > exp:
+        raise HTTPException(status_code=400, detail="Verification code has expired. Please request a new code.")
+
+    # Mark OTP as verified
+    record.is_verified = True
+
+    # Update business settings
+    if req.name and req.name.strip():
+        biz.name = req.name.strip()
+    if req.owner_name and req.owner_name.strip():
+        biz.owner_name = req.owner_name.strip()
+    if req.phone and req.phone.strip():
+        biz.phone = req.phone.strip()
+    if req.address and req.address.strip():
+        biz.address = req.address.strip()
+    if req.receipt_footer is not None:
+        biz.receipt_footer = req.receipt_footer.strip()
+    if req.logo_base64 is not None:
+        biz.logo_base64 = req.logo_base64.strip()
+
+    db.commit()
+    db.refresh(biz)
+
+    log_activity(db, code_clean, biz.owner_name, "BUSINESS_PROFILE_UPDATED", f"Business profile updated via OTP verification.")
+
+    return {
+        "success": True,
+        "message": "Business settings updated successfully!",
+        "business": {
+            "business_code": biz.business_code,
+            "name": biz.name,
+            "owner_name": biz.owner_name,
+            "email": biz.email,
+            "phone": biz.phone,
+            "address": biz.address,
+            "receipt_footer": biz.receipt_footer,
+            "logo_base64": biz.logo_base64
+        }
+    }
+
+@app.post("/api/business/delete")
+def business_delete_with_otp(req: BusinessDeleteRequest, db: Session = Depends(get_db)):
+    """
+    Permanently deletes a business and all associated tenant records upon valid OTP verification.
+    """
+    code_clean = req.business_code.strip().upper()
+    biz = db.query(Business).filter(Business.business_code == code_clean).first()
+    if not biz:
+        raise HTTPException(status_code=404, detail="Business not found.")
+
+    otp_clean = req.otp_code.strip()
+    record = db.query(OTPVerification).filter(
+        OTPVerification.email == biz.email.lower().strip(),
+        OTPVerification.otp_code == otp_clean,
+        OTPVerification.is_verified == False
+    ).order_by(desc(OTPVerification.created_at)).first()
+
+    if not record:
+        raise HTTPException(status_code=400, detail="Invalid OTP deletion code. Please check and try again.")
+
+    now = datetime.now(timezone.utc)
+    exp = record.expires_at
+    if exp.tzinfo is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+    if now > exp:
+        raise HTTPException(status_code=400, detail="Deletion code has expired. Please request a new code.")
+
+    record.is_verified = True
+    biz_name = biz.name
+
+    # Cascade delete tenant records
+    db.query(Invoice).filter(Invoice.business_code == code_clean).delete(synchronize_session=False)
+    db.query(StockLog).filter(StockLog.business_code == code_clean).delete(synchronize_session=False)
+    db.query(Item).filter(Item.business_code == code_clean).delete(synchronize_session=False)
+    db.query(CreditLedger).filter(CreditLedger.business_code == code_clean).delete(synchronize_session=False)
+    db.query(CreditCustomer).filter(CreditCustomer.business_code == code_clean).delete(synchronize_session=False)
+    db.query(ActivityLog).filter(ActivityLog.business_code == code_clean).delete(synchronize_session=False)
+    db.query(POSUser).filter(POSUser.business_code == code_clean).delete(synchronize_session=False)
+    db.query(SupportTicket).filter(SupportTicket.business_code == code_clean).delete(synchronize_session=False)
+    db.delete(biz)
+    db.commit()
+
+    logger.info(f"[STORE DELETED BY OWNER] Business '{biz_name}' ({code_clean}) deleted via email OTP.")
+
+    return {
+        "success": True,
+        "message": f"Business '{biz_name}' ({code_clean}) and all associated records have been permanently deleted."
+    }
+
+# ---------------------------------------------------------------------------
+# Support Ticket System Endpoints
+# ---------------------------------------------------------------------------
+@app.post("/api/support/tickets")
+def create_support_ticket(req: SupportTicketCreateRequest, db: Session = Depends(get_db)):
+    """
+    Submits a new support inquiry / ticket.
+    Can be submitted by:
+    1. Logged-in POS user (providing business_code)
+    2. Public Landing page user (providing mandatory registered email address)
+    """
+    subject_clean = req.subject.strip()
+    msg_clean = req.message.strip()
+
+    if not subject_clean or not msg_clean:
+        raise HTTPException(status_code=400, detail="Subject and message are required.")
+
+    code_clean = req.business_code.strip().upper() if (req.business_code and req.business_code.strip()) else None
+    email_clean = req.email.strip().lower() if (req.email and req.email.strip()) else None
+
+    if not code_clean and not email_clean:
+        raise HTTPException(
+            status_code=400,
+            detail="Registered Email Address or Business Code is required to submit a support ticket."
+        )
+
+    if email_clean and ("@" not in email_clean or "." not in email_clean):
+        raise HTTPException(status_code=400, detail="Please enter a valid email address.")
+
+    biz = None
+    if code_clean:
+        biz = db.query(Business).filter(Business.business_code == code_clean).first()
+
+    if not biz and email_clean:
+        biz = db.query(Business).filter(func.lower(Business.email) == email_clean).first()
+
+    if biz:
+        biz_code_val = biz.business_code
+        biz_name_val = biz.name
+        owner_email_val = email_clean or biz.email
+        owner_name_val = req.name.strip() if (req.name and req.name.strip()) else (biz.owner_name or "Store Owner")
+        biz_id_val = biz.id
+    else:
+        biz_code_val = code_clean or "PUBLIC"
+        biz_name_val = "Public Inquirer"
+        owner_email_val = email_clean
+        owner_name_val = req.name.strip() if (req.name and req.name.strip()) else "Client / Merchant"
+        biz_id_val = None
+
+    ticket = SupportTicket(
+        business_id=biz_id_val,
+        business_code=biz_code_val,
+        business_name=biz_name_val,
+        owner_email=owner_email_val,
+        owner_name=owner_name_val,
+        subject=subject_clean,
+        message=msg_clean,
+        status="open"
+    )
+    db.add(ticket)
+    db.commit()
+    db.refresh(ticket)
+
+    if biz_code_val and biz_code_val != "PUBLIC":
+        log_activity(db, biz_code_val, owner_name_val, "SUPPORT_TICKET_CREATED", f"Support ticket #{ticket.id} created: '{subject_clean}'")
+
+    # Send confirmation email to user via Resend API
+    if owner_email_val:
+        confirm_subj = f"SupiriPOS Support Ticket Created: #{ticket.id} - {ticket.subject}"
+        confirm_html = f"""
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"></head>
+        <body style="margin: 0; padding: 25px 15px; background-color: #0b1120; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #f8fafc;">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 540px; margin: 0 auto; background-color: #0f172a; border-radius: 14px; border: 1px solid #1e293b; padding: 28px;">
+                <tr><td>
+                    <div style="font-size: 20px; font-weight: 800; color: #10b981; margin-bottom: 6px;">SupiriPOS <span style="color: #38bdf8;">PRO</span> Support</div>
+                    <div style="font-size: 13px; color: #94a3b8; margin-bottom: 20px;">We received your support ticket <strong>#{ticket.id}</strong></div>
+                    <div style="background: rgba(16, 185, 129, 0.08); border-left: 3px solid #10b981; padding: 14px; border-radius: 6px; margin-bottom: 20px;">
+                        <div style="font-size: 12px; font-weight: 700; color: #10b981; margin-bottom: 4px;">Subject: {ticket.subject}</div>
+                        <div style="font-size: 13px; color: #cbd5e1; white-space: pre-wrap;">{ticket.message}</div>
+                    </div>
+                    <p style="font-size: 13px; color: #94a3b8; line-height: 1.5;">Our support and engineering team has been notified. You will receive an official response right here in this email thread once an agent reviews your ticket.</p>
+                    <div style="border-top: 1px solid #1e293b; padding-top: 16px; margin-top: 24px; text-align: center; font-size: 11px; color: #64748b;">PrasaTek System Solutions &bull; Sri Lanka</div>
+                </td></tr>
+            </table>
+        </body></html>
+        """
+        send_email_in_background(
+            to_email=owner_email_val,
+            subject=confirm_subj,
+            html_content=confirm_html,
+            plain_text=f"Your ticket #{ticket.id} ({ticket.subject}) has been received. Our team will review and reply shortly.",
+            context_label="TICKET-CONFIRM"
+        )
+
+    return {
+        "success": True,
+        "message": f"Support ticket #{ticket.id} submitted successfully! A confirmation has been sent to {owner_email_val or 'your email'}.",
+        "ticket": {
+            "id": ticket.id,
+            "business_code": ticket.business_code,
+            "business_name": ticket.business_name,
+            "owner_email": ticket.owner_email,
+            "owner_name": ticket.owner_name,
+            "subject": ticket.subject,
+            "message": ticket.message,
+            "status": ticket.status,
+            "created_at": ticket.created_at.isoformat() if ticket.created_at else datetime.now(timezone.utc).isoformat()
+        }
+    }
+
+@app.get("/api/support/tickets")
+def list_merchant_support_tickets(
+    business_code: Optional[str] = None,
+    email: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Lists tickets submitted by a specific business_code or email"""
+    query = db.query(SupportTicket)
+    if business_code and business_code.strip():
+        code_clean = business_code.strip().upper()
+        query = query.filter(SupportTicket.business_code == code_clean)
+    elif email and email.strip():
+        email_clean = email.strip().lower()
+        query = query.filter(func.lower(SupportTicket.owner_email) == email_clean)
+    else:
+        return {"success": True, "tickets": [], "total": 0}
+
+    tickets = query.order_by(desc(SupportTicket.created_at)).all()
+
+    result = []
+    for t in tickets:
+        result.append({
+            "id": t.id,
+            "business_code": t.business_code,
+            "business_name": t.business_name,
+            "owner_email": t.owner_email,
+            "subject": t.subject,
+            "message": t.message,
+            "status": t.status,
+            "admin_reply": t.admin_reply,
+            "replied_at": t.replied_at.isoformat() if t.replied_at else None,
+            "created_at": t.created_at.isoformat() if t.created_at else None
+        })
+
+    return {"success": True, "tickets": result, "total": len(result)}
+
+@app.get("/api/admin/support/tickets")
+def admin_list_support_tickets(admin: SystemAdmin = Depends(get_current_admin), db: Session = Depends(get_db)):
+    """Master Admin endpoint: lists all tickets from all businesses"""
+    tickets = db.query(SupportTicket).order_by(desc(SupportTicket.created_at)).all()
+    result = []
+    open_count = 0
+    for t in tickets:
+        if t.status == "open":
+            open_count += 1
+        result.append({
+            "id": t.id,
+            "business_id": t.business_id,
+            "business_code": t.business_code,
+            "business_name": t.business_name or t.business_code,
+            "owner_email": t.owner_email,
+            "owner_name": t.owner_name,
+            "subject": t.subject,
+            "message": t.message,
+            "status": t.status,
+            "admin_reply": t.admin_reply,
+            "replied_at": t.replied_at.isoformat() if t.replied_at else None,
+            "created_at": t.created_at.isoformat() if t.created_at else None
+        })
+
+    return {
+        "success": True,
+        "tickets": result,
+        "total": len(result),
+        "open_count": open_count
+    }
+
+@app.post("/api/admin/support/tickets/{ticket_id}/reply")
+def admin_reply_support_ticket(ticket_id: int, req: AdminTicketReplyRequest, admin: SystemAdmin = Depends(get_current_admin), db: Session = Depends(get_db)):
+    """
+    Super Admin replies to a ticket.
+    Updates database status and dispatches official email reply via Resend API to the merchant.
+    """
+    ticket = db.query(SupportTicket).filter(SupportTicket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Support ticket not found.")
+
+    reply_clean = (req.reply_message or req.reply or "").strip()
+    if not reply_clean:
+        raise HTTPException(status_code=400, detail="Reply message cannot be empty.")
+
+    ticket.admin_reply = reply_clean
+    ticket.status = req.status if req.status in ["open", "resolved"] else "resolved"
+    ticket.replied_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(ticket)
+
+    # Dispatch email reply via Resend API
+    if ticket.owner_email:
+        reply_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"></head>
+        <body style="margin: 0; padding: 25px 15px; background-color: #0b1120; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #f8fafc;">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 580px; margin: 0 auto; background-color: #0f172a; border-radius: 14px; border: 1px solid #1e293b; padding: 28px;">
+                <tr>
+                    <td>
+                        <div style="margin-bottom: 4px;">
+                            <span style="font-size: 22px; font-weight: 800; color: #10b981;">SupiriPOS <span style="color: #38bdf8;">PRO</span></span>
+                        </div>
+                        <p style="margin: 0 0 16px 0; font-size: 12px; color: #94a3b8;">PrasaTek System Solutions Customer Support Desk</p>
+                        <div style="height: 1px; width: 100%; background: #1e293b; margin-bottom: 20px;"></div>
+
+                        <h3 style="margin: 0 0 12px 0; color: #ffffff; font-size: 18px;">
+                            Response to Ticket #{ticket.id}: {ticket.subject}
+                        </h3>
+                        <p style="font-size: 13.5px; color: #cbd5e1; line-height: 1.5; margin: 0 0 14px 0;">
+                            Hello <strong>{ticket.owner_name or 'Store Partner'}</strong> ({ticket.business_name}),<br>
+                            Our technical support team has reviewed your ticket and provided the following response:
+                        </p>
+
+                        <!-- Admin Reply Card -->
+                        <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10b981; border-radius: 6px; padding: 16px; margin: 18px 0;">
+                            <div style="font-size: 11px; text-transform: uppercase; color: #10b981; font-weight: 700; margin-bottom: 6px;">
+                                💬 Official Support Response (Status: {ticket.status.upper()})
+                            </div>
+                            <div style="font-size: 14px; line-height: 1.6; color: #ffffff; white-space: pre-wrap;">{reply_clean}</div>
+                        </div>
+
+                        <!-- Original Inquiry -->
+                        <div style="background: #1e293b; border-radius: 8px; padding: 14px; margin: 16px 0;">
+                            <div style="font-size: 11px; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">Your Original Inquiry:</div>
+                            <div style="font-size: 13px; color: #94a3b8; font-style: italic; white-space: pre-wrap;">{ticket.message}</div>
+                        </div>
+
+                        <p style="font-size: 12.5px; color: #64748b; line-height: 1.5; margin-top: 20px;">
+                            If you have further questions or if your issue is not completely resolved, you can submit an additional ticket directly from your POS dashboard or email us at <a href="mailto:info@prasatek.lk" style="color: #38bdf8;">info@prasatek.lk</a>.
+                        </p>
+
+                        <div style="border-top: 1px solid #1e293b; padding-top: 16px; margin-top: 20px; text-align: center;">
+                            <p style="margin: 0; font-size: 12px; font-weight: 700; color: #f1f5f9;">PrasaTek System Solutions</p>
+                            <p style="margin: 3px 0 0 0; font-size: 11px; color: #64748b;">Enterprise Software &amp; Smart Cloud Solutions &bull; Sri Lanka</p>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </body>
+        </html>
+        """
+
+        send_email_in_background(
+            to_email=ticket.owner_email,
+            subject=f"Re: [Ticket #{ticket.id}] {ticket.subject}",
+            html_content=reply_html,
+            plain_text=f"SupiriPOS PRO Support Response (Ticket #{ticket.id})\n\nOfficial Reply:\n{reply_clean}\n\nOriginal Inquiry:\n{ticket.message}\n\nStatus: {ticket.status.upper()}\nPrasaTek System Solutions",
+            context_label="SUPPORT-REPLY"
+        )
+
+    return {
+        "success": True,
+        "message": f"Reply dispatched to {ticket.owner_email} and ticket #{ticket.id} marked as {ticket.status}.",
+        "ticket": {
+            "id": ticket.id,
+            "status": ticket.status,
+            "admin_reply": ticket.admin_reply,
+            "replied_at": ticket.replied_at.isoformat() if ticket.replied_at else None
+        }
     }
 
 # ---------------------------------------------------------------------------
