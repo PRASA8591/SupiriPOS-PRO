@@ -1254,7 +1254,7 @@
         </div>
       </div>
 
-      <!-- Center: All 6 Navigation Tabs (Readable Sizing Without Pushing Right Controls Off-Screen) -->
+      <!-- Center: Core 6 Navigation Tabs -->
       <nav id="pos-nav-tabs"
         style="display: flex; align-items: center; justify-content: center; gap: 4px; background: rgba(15, 23, 42, 0.78); padding: 4px; border-radius: 12px; border: 1px solid var(--border-glass); min-width: 0; flex: 0 1 auto; flex-wrap: nowrap; overflow-x: auto;">
         <button id="nav-btn-dashboard" class="btn btn-sm btn-cyan"
@@ -1287,20 +1287,15 @@
           onclick="switchPOSTab('reports')">
           📈 Reports
         </button>
-        <button id="nav-btn-support" class="btn btn-sm btn-glass"
-          style="padding: 7px 11px; font-size: 13px; font-weight: 600; border-radius: 9px; gap: 5px; white-space: nowrap; flex-shrink: 0;"
-          onclick="switchPOSTab('support')">
-          🎧 Support
-        </button>
       </nav>
 
-      <!-- Right: Legible User Pill Dropdown, Guide & Logout — 100% VISIBLE AT ALL TIMES -->
+      <!-- Right: User Dropdown (Settings, Guide, Support Ticket, Logout) & Full Screen Toggle -->
       <div style="display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-shrink: 0;">
-        <!-- User Pill Dropdown Menu (Settings, Guide & Tickets) -->
+        <!-- User Pill Dropdown Menu -->
         <div id="pos-user-dropdown-container" style="position: relative; display: inline-block; flex-shrink: 0;">
           <div id="ws-user-pill-btn" onclick="togglePosUserDropdown(event)" class="badge"
             style="cursor: pointer; background: rgba(255, 255, 255, 0.08); border: 1px solid var(--border-glass); border-radius: 9px; padding: 6px 11px; font-size: 12.5px; font-weight: 600; color: #f8fafc; text-transform: none; white-space: nowrap; display: flex; align-items: center; gap: 6px; flex-shrink: 0; user-select: none; transition: all 0.2s;"
-            title="User Menu (Settings, Support & Guide)"
+            title="User Menu (Profile Settings, Guide, Support Ticket, Logout)"
             onmouseenter="this.style.borderColor='var(--cyan)'; this.style.background='rgba(6, 182, 212, 0.12)';"
             onmouseleave="this.style.borderColor='var(--border-glass)'; this.style.background='rgba(255, 255, 255, 0.08)';">
             <span>👤</span>
@@ -1329,31 +1324,19 @@
 
             <!-- Dropdown Actions -->
             <div style="padding: 6px 0;">
-              <!-- 1. Create Support Ticket -->
-              <a href="javascript:void(0)" onclick="openPosSupportModal(); closePosUserDropdown();"
-                style="display: flex; align-items: center; gap: 10px; padding: 10px 16px; color: #f1f5f9; text-decoration: none; font-size: 13px; transition: background 0.15s;"
-                onmouseenter="this.style.background='rgba(16, 185, 129, 0.12)'"
-                onmouseleave="this.style.background='transparent'">
-                <span style="font-size: 16px;">🎧</span>
-                <div>
-                  <div style="font-weight: 700; color: #ffffff;">Create Support Ticket</div>
-                  <div style="font-size: 11px; color: var(--text-dim);">Technical help &amp; inquiries</div>
-                </div>
-              </a>
-
-              <!-- 2. Business Settings -->
+              <!-- 1. Profile Settings -->
               <a href="javascript:void(0)" onclick="openBusinessSettingsModal(); closePosUserDropdown();"
                 style="display: flex; align-items: center; gap: 10px; padding: 10px 16px; color: #f1f5f9; text-decoration: none; font-size: 13px; transition: background 0.15s;"
                 onmouseenter="this.style.background='rgba(6, 182, 212, 0.12)'"
                 onmouseleave="this.style.background='transparent'">
                 <span style="font-size: 16px;">⚙️</span>
                 <div>
-                  <div style="font-weight: 700; color: #ffffff;">Business Settings</div>
+                  <div style="font-weight: 700; color: #ffffff;">Profile Settings</div>
                   <div style="font-size: 11px; color: var(--text-dim);">Store profile &amp; OTP security</div>
                 </div>
               </a>
 
-              <!-- 3. User Guide -->
+              <!-- 2. User Guide -->
               <a href="javascript:void(0)" onclick="openUserGuideModal(); closePosUserDropdown();"
                 style="display: flex; align-items: center; gap: 10px; padding: 10px 16px; color: #f1f5f9; text-decoration: none; font-size: 13px; transition: background 0.15s;"
                 onmouseenter="this.style.background='rgba(255, 255, 255, 0.08)'"
@@ -1362,6 +1345,18 @@
                 <div>
                   <div style="font-weight: 700; color: #ffffff;">User Guide</div>
                   <div style="font-size: 11px; color: var(--text-dim);">English &amp; සිංහල documentation</div>
+                </div>
+              </a>
+
+              <!-- 3. Support Ticket -->
+              <a href="javascript:void(0)" onclick="openPosSupportModal(); closePosUserDropdown();"
+                style="display: flex; align-items: center; gap: 10px; padding: 10px 16px; color: #f1f5f9; text-decoration: none; font-size: 13px; transition: background 0.15s;"
+                onmouseenter="this.style.background='rgba(16, 185, 129, 0.12)'"
+                onmouseleave="this.style.background='transparent'">
+                <span style="font-size: 16px;">🎧</span>
+                <div>
+                  <div style="font-weight: 700; color: #ffffff;">Support Ticket</div>
+                  <div style="font-size: 11px; color: var(--text-dim);">Technical help &amp; inquiries</div>
                 </div>
               </a>
             </div>
@@ -1373,25 +1368,17 @@
                 onmouseenter="this.style.background='rgba(239, 68, 68, 0.12)'"
                 onmouseleave="this.style.background='transparent'">
                 <span style="font-size: 16px;">🚪</span>
-                <span style="font-weight: 700;">Logout Staff User</span>
+                <span style="font-weight: 700;">Logout</span>
               </a>
             </div>
           </div>
         </div>
 
-        <span id="ws-clock" class="hide-below-2xl"
-          style="font-family: var(--font-mono); font-size: 12.5px; color: var(--text-muted); font-weight: 600; min-width: 74px; text-align: center;">12:00:00
-          PM</span>
-
+        <!-- Full Screen Toggle Button -->
         <button class="btn btn-glass btn-sm"
           style="padding: 7px 9px; font-size: 12.5px; border-radius: 9px; flex-shrink: 0;" onclick="toggleFullscreen()"
           title="Full Screen">
           ⛶
-        </button>
-        <button class="btn btn-danger btn-sm"
-          style="padding: 7px 11px; font-size: 12.5px; border-radius: 9px; gap: 5px; flex-shrink: 0;"
-          onclick="logoutStaffUser()" title="Logout Staff User">
-          🚪 Logout
         </button>
       </div>
     </header>
@@ -3531,6 +3518,9 @@
             </label>
             <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
               <input type="checkbox" id="perm-reports"> 📈 Reports Page (Sales & Profit)
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="perm-settings"> ⚙️ Settings (Business Profile &amp; OTP Configuration)
             </label>
           </div>
         </div>

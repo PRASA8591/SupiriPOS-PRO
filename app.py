@@ -204,6 +204,7 @@ class POSUser(Base):
     can_stock = Column(Boolean, default=True)
     can_users = Column(Boolean, default=True)
     can_reports = Column(Boolean, default=True)
+    can_settings = Column(Boolean, default=False)
     must_change_password = Column(Boolean, default=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
@@ -335,7 +336,10 @@ try:
                 cols = [r[1] for r in res]
                 if "must_change_password" not in cols:
                     conn.execute(text("ALTER TABLE pos_users ADD COLUMN must_change_password BOOLEAN DEFAULT 0"))
-                    conn.commit()
+                if "can_settings" not in cols:
+                    conn.execute(text("ALTER TABLE pos_users ADD COLUMN can_settings BOOLEAN DEFAULT 0"))
+                    conn.execute(text("UPDATE pos_users SET can_settings = 1 WHERE username IN ('user', 'admin') OR role_title LIKE '%Manager%' OR role_title LIKE '%Admin%'"))
+                conn.commit()
 
                 b_res = conn.execute(text("PRAGMA table_info(businesses)")).fetchall()
                 b_cols = [r[1] for r in b_res]
@@ -358,6 +362,8 @@ try:
                 conn.commit()
             else:
                 conn.execute(text("ALTER TABLE pos_users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT FALSE"))
+                conn.execute(text("ALTER TABLE pos_users ADD COLUMN IF NOT EXISTS can_settings BOOLEAN DEFAULT FALSE"))
+                conn.execute(text("UPDATE pos_users SET can_settings = TRUE WHERE username IN ('user', 'admin') OR role_title ILIKE '%Manager%' OR role_title ILIKE '%Admin%'"))
                 conn.execute(text("ALTER TABLE businesses ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE"))
                 conn.execute(text("ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS phone VARCHAR(50)"))
                 conn.execute(text("ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT 'Technical Issue'"))
@@ -527,7 +533,8 @@ def seed_demo_supermarket(db: Session):
             can_items=True,
             can_stock=True,
             can_users=True,
-            can_reports=True
+            can_reports=True,
+            can_settings=True
         )
         db.add(demo_user)
 
@@ -923,6 +930,7 @@ class UserCreateUpdateRequest(BaseModel):
     can_stock: bool = True
     can_users: bool = True
     can_reports: bool = True
+    can_settings: bool = False
 
 class ChangeInitialCredentialsRequest(BaseModel):
     business_code: str
@@ -1241,8 +1249,8 @@ def register_business(req: RegisterBusinessRequest, db: Session = Depends(get_db
     # Generate sequential business code: PT-00001, PT-00002...
     business_code = generate_next_business_code(db)
 
-    # Use default logo if not provided
-    logo_val = req.logo_base64 if req.logo_base64 else "/assets/logo.png"
+    # Do not set any default fallback logo if not provided by user
+    logo_val = req.logo_base64.strip() if req.logo_base64 and req.logo_base64.strip() and req.logo_base64.strip() != "/assets/logo.png" else None
 
     # Create Business
     new_biz = Business(
@@ -1273,6 +1281,7 @@ def register_business(req: RegisterBusinessRequest, db: Session = Depends(get_db
         can_stock=True,
         can_users=True,
         can_reports=True,
+        can_settings=True,
         must_change_password=True
     )
     db.add(default_user)
@@ -1504,8 +1513,10 @@ def pos_login(req: POSLoginRequest, db: Session = Depends(get_db)):
                 "items": user.can_items,
                 "stock": user.can_stock,
                 "users": user.can_users,
-                "reports": user.can_reports
-            }
+                "reports": user.can_reports,
+                "settings": getattr(user, "can_settings", False)
+            },
+            "can_settings": getattr(user, "can_settings", False)
         }
     }
 
@@ -1650,8 +1661,10 @@ def change_initial_credentials(req: ChangeInitialCredentialsRequest, db: Session
                 "items": user.can_items,
                 "stock": user.can_stock,
                 "users": user.can_users,
-                "reports": user.can_reports
-            }
+                "reports": user.can_reports,
+                "settings": getattr(user, "can_settings", False)
+            },
+            "can_settings": getattr(user, "can_settings", False)
         }
     }
 
@@ -2667,6 +2680,7 @@ def get_users(business_code: str, db: Session = Depends(get_db)):
             "can_stock": u.can_stock,
             "can_users": u.can_users,
             "can_reports": u.can_reports,
+            "can_settings": bool(getattr(u, "can_settings", False)),
             "created_at": u.created_at.isoformat()
         })
     return result
@@ -2694,7 +2708,8 @@ async def create_user(req: UserCreateUpdateRequest, db: Session = Depends(get_db
         can_items=req.can_items,
         can_stock=req.can_stock,
         can_users=req.can_users,
-        can_reports=req.can_reports
+        can_reports=req.can_reports,
+        can_settings=req.can_settings
     )
     db.add(new_user)
     db.commit()
@@ -2735,6 +2750,7 @@ async def update_user(user_id: int, req: UserCreateUpdateRequest, db: Session = 
     user.can_stock = req.can_stock
     user.can_users = req.can_users
     user.can_reports = req.can_reports
+    user.can_settings = req.can_settings
 
     if req.password and req.password.strip():
         user.password_hash = hash_password(req.password.strip())
@@ -3154,6 +3170,7 @@ def admin_create_business(req: AdminCreateBusinessRequest, admin: SystemAdmin = 
         can_stock=True,
         can_users=True,
         can_reports=True,
+        can_settings=True,
         must_change_password=(term_user == "user" and term_pass == "123")
     )
     db.add(user)
@@ -3435,7 +3452,8 @@ def business_update_settings(req: BusinessUpdateSettingsRequest, db: Session = D
     if req.receipt_footer is not None:
         biz.receipt_footer = req.receipt_footer.strip()
     if req.logo_base64 is not None:
-        biz.logo_base64 = req.logo_base64.strip()
+        raw_logo = req.logo_base64.strip()
+        biz.logo_base64 = raw_logo if (raw_logo and raw_logo != "/assets/logo.png" and not raw_logo.endswith("/logo.png")) else None
 
     db.commit()
     db.refresh(biz)

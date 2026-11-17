@@ -155,7 +155,8 @@ function hasUserTabPermission(tabName) {
     items: user.can_items !== undefined ? Boolean(user.can_items) : true,
     stock: user.can_stock !== undefined ? Boolean(user.can_stock) : true,
     users: user.can_users !== undefined ? Boolean(user.can_users) : true,
-    reports: user.can_reports !== undefined ? Boolean(user.can_reports) : true
+    reports: user.can_reports !== undefined ? Boolean(user.can_reports) : true,
+    settings: user.can_settings !== undefined ? Boolean(user.can_settings) : false
   };
 
   const normalized = String(tabName || '').toLowerCase();
@@ -168,7 +169,7 @@ function hasUserTabPermission(tabName) {
   if (normalized === 'users' || normalized === 'staff') return Boolean(perms.users);
   if (normalized === 'reports') return Boolean(perms.reports);
   if (normalized === 'settings') {
-    return Boolean(perms.users || user.role_title === 'Store Manager' || user.role_title === 'Admin');
+    return Boolean(perms.settings);
   }
   if (normalized === 'support') return true;
   return false;
@@ -2029,7 +2030,15 @@ function renderThermalReceipt(inv, format = '80mm') {
   const is58mm = format === '58mm';
   const widthStyle = is58mm ? 'max-width: 240px; font-size: 10px;' : 'max-width: 320px; font-size: 12px;';
 
-  const logoHtml = biz.logo_base64 ? `
+  // Strict check: Only render custom merchant logo; NEVER use default fallback logo
+  const hasCustomLogo = Boolean(
+    biz.logo_base64 && 
+    biz.logo_base64.trim() !== '' && 
+    biz.logo_base64 !== '/assets/logo.png' &&
+    !biz.logo_base64.endsWith('/logo.png')
+  );
+
+  const logoHtml = hasCustomLogo ? `
     <div style="text-align: center; margin-bottom: 8px;">
       <img src="${biz.logo_base64}" alt="Logo" style="max-height: 48px; max-width: 140px; object-fit: contain;">
     </div>
@@ -2154,7 +2163,15 @@ function renderCreditPaymentReceipt(paymentData, format = '80mm') {
   const is58mm = format === '58mm';
   const widthStyle = is58mm ? 'max-width: 240px; font-size: 10px;' : 'max-width: 320px; font-size: 12px;';
 
-  const logoHtml = biz.logo_base64 ? `
+  // Strict check: Only render custom merchant logo; NEVER use default fallback logo
+  const hasCustomLogo = Boolean(
+    biz.logo_base64 && 
+    biz.logo_base64.trim() !== '' && 
+    biz.logo_base64 !== '/assets/logo.png' &&
+    !biz.logo_base64.endsWith('/logo.png')
+  );
+
+  const logoHtml = hasCustomLogo ? `
     <div style="text-align: center; margin-bottom: 8px;">
       <img src="${biz.logo_base64}" alt="Logo" style="max-height: 48px; max-width: 140px; object-fit: contain;">
     </div>
@@ -2515,8 +2532,9 @@ async function loadUsersTable() {
         u.can_items ? '<span class="badge badge-glass">Items</span>' : '',
         u.can_stock ? '<span class="badge badge-glass">Stock</span>' : '',
         u.can_users ? '<span class="badge badge-glass">Users</span>' : '',
-        u.can_reports ? '<span class="badge badge-emerald">Reports</span>' : ''
-      ].join(' ');
+        u.can_reports ? '<span class="badge badge-emerald">Reports</span>' : '',
+        u.can_settings ? '<span class="badge badge-warning">Settings</span>' : ''
+      ].filter(Boolean).join(' ');
 
       return `
         <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
@@ -2551,6 +2569,8 @@ function openAddUserModal() {
   document.getElementById('perm-stock').checked = false;
   document.getElementById('perm-users').checked = false;
   document.getElementById('perm-reports').checked = false;
+  const permSet = document.getElementById('perm-settings');
+  if (permSet) permSet.checked = false;
 
   document.getElementById('modal-user-form').classList.add('active');
 }
@@ -2571,11 +2591,13 @@ async function openEditUserModal(userId) {
     document.getElementById('user-form-password').required = false;
     document.getElementById('user-pw-hint').style.display = 'inline';
 
-    document.getElementById('perm-billing').checked = u.can_billing;
-    document.getElementById('perm-items').checked = u.can_items;
-    document.getElementById('perm-stock').checked = u.can_stock;
-    document.getElementById('perm-users').checked = u.can_users;
-    document.getElementById('perm-reports').checked = u.can_reports;
+    document.getElementById('perm-billing').checked = Boolean(u.can_billing);
+    document.getElementById('perm-items').checked = Boolean(u.can_items);
+    document.getElementById('perm-stock').checked = Boolean(u.can_stock);
+    document.getElementById('perm-users').checked = Boolean(u.can_users);
+    document.getElementById('perm-reports').checked = Boolean(u.can_reports);
+    const permSet = document.getElementById('perm-settings');
+    if (permSet) permSet.checked = Boolean(u.can_settings);
 
     document.getElementById('modal-user-form').classList.add('active');
   } catch (e) { }
@@ -2588,6 +2610,7 @@ function closeUserModal() {
 async function handleSaveUser(e) {
   e.preventDefault();
   const id = document.getElementById('user-form-id').value;
+  const permSet = document.getElementById('perm-settings');
   const payload = {
     business_code: AppState.business.business_code,
     username: document.getElementById('user-form-username').value.trim(),
@@ -2598,7 +2621,8 @@ async function handleSaveUser(e) {
     can_items: document.getElementById('perm-items').checked,
     can_stock: document.getElementById('perm-stock').checked,
     can_users: document.getElementById('perm-users').checked,
-    can_reports: document.getElementById('perm-reports').checked
+    can_reports: document.getElementById('perm-reports').checked,
+    can_settings: permSet ? permSet.checked : false
   };
 
   try {
@@ -6224,6 +6248,12 @@ function openBusinessSettingsModal() {
     return;
   }
 
+  // Permission check: Only staff members explicitly granted Settings permission can access
+  if (!hasUserTabPermission('settings')) {
+    showToast("⚠️ Access Denied: You do not have permission to access Business Settings.", "warning");
+    return;
+  }
+
   const modal = document.getElementById('modal-pos-settings');
   if (!modal) return;
 
@@ -6242,8 +6272,18 @@ function openBusinessSettingsModal() {
   if (emailInput) emailInput.value = b.email || '';
   if (addressInput) addressInput.value = b.address || '';
   if (footerInput) footerInput.value = b.receipt_footer || '';
-  if (logoPreview) logoPreview.src = b.logo_base64 || '/assets/logo.png';
-  modalPendingLogoBase64 = b.logo_base64 || null;
+  
+  const hasCustomLogo = Boolean(b.logo_base64 && b.logo_base64 !== '/assets/logo.png' && !b.logo_base64.endsWith('/logo.png'));
+  if (logoPreview) {
+    if (hasCustomLogo) {
+      logoPreview.src = b.logo_base64;
+      logoPreview.style.display = 'block';
+    } else {
+      logoPreview.src = '';
+      logoPreview.style.display = 'none';
+    }
+  }
+  modalPendingLogoBase64 = hasCustomLogo ? b.logo_base64 : null;
 
   modal.classList.add('active');
 }
@@ -6259,7 +6299,10 @@ function previewModalLogo(input) {
     reader.onload = function(e) {
       modalPendingLogoBase64 = e.target.result;
       const preview = document.getElementById('modal-set-logo-preview');
-      if (preview) preview.src = modalPendingLogoBase64;
+      if (preview) {
+        preview.src = modalPendingLogoBase64;
+        preview.style.display = 'block';
+      }
     };
     reader.readAsDataURL(input.files[0]);
   }
@@ -6268,6 +6311,11 @@ function previewModalLogo(input) {
 async function handleModalSettingsSubmit(e) {
   e.preventDefault();
   if (!AppState.business) return;
+
+  if (!hasUserTabPermission('settings')) {
+    showToast("⚠️ Access Denied: You do not have permission to modify Business Settings.", "warning");
+    return;
+  }
 
   const name = document.getElementById('modal-set-name').value.trim();
   const owner_name = document.getElementById('modal-set-owner').value.trim();
