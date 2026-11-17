@@ -1195,13 +1195,13 @@
               <thead>
                 <tr
                   style="border-bottom: 1px solid var(--border-glass); color: var(--text-muted); background: rgba(0,0,0,0.25);">
-                  <th style="padding: 12px 14px; width: 80px;">Ticket #</th>
+                  <th style="padding: 12px 14px; width: 110px;">Ticket &amp; Priority</th>
                   <th style="padding: 12px 14px;">Store &amp; Location</th>
-                  <th style="padding: 12px 14px;">Owner &amp; Email</th>
-                  <th style="padding: 12px 14px;">Subject &amp; Inquiry</th>
+                  <th style="padding: 12px 14px;">Contact (Email &amp; Phone)</th>
+                  <th style="padding: 12px 14px;">Category &amp; Inquiry</th>
                   <th style="padding: 12px 14px; width: 110px;">Status</th>
                   <th style="padding: 12px 14px; width: 120px;">Created</th>
-                  <th style="padding: 12px 14px; text-align: right; width: 100px;">Actions</th>
+                  <th style="padding: 12px 14px; text-align: right; width: 110px;">Actions</th>
                 </tr>
               </thead>
               <tbody id="admin-tickets-table-body">
@@ -1286,11 +1286,6 @@
           style="padding: 7px 11px; font-size: 13px; font-weight: 600; border-radius: 9px; gap: 5px; white-space: nowrap; flex-shrink: 0;"
           onclick="switchPOSTab('reports')">
           📈 Reports
-        </button>
-        <button id="nav-btn-settings" class="btn btn-sm btn-glass"
-          style="padding: 7px 11px; font-size: 13px; font-weight: 600; border-radius: 9px; gap: 5px; white-space: nowrap; flex-shrink: 0;"
-          onclick="switchPOSTab('settings')">
-          ⚙️ Settings
         </button>
         <button id="nav-btn-support" class="btn btn-sm btn-glass"
           style="padding: 7px 11px; font-size: 13px; font-weight: 600; border-radius: 9px; gap: 5px; white-space: nowrap; flex-shrink: 0;"
@@ -1388,11 +1383,6 @@
           style="font-family: var(--font-mono); font-size: 12.5px; color: var(--text-muted); font-weight: 600; min-width: 74px; text-align: center;">12:00:00
           PM</span>
 
-        <button class="btn btn-glass btn-sm"
-          style="padding: 7px 11px; font-size: 12.5px; border-radius: 9px; gap: 5px; flex-shrink: 0;"
-          onclick="openUserGuideModal()" title="Help Guide">
-          📖 Guide
-        </button>
         <button class="btn btn-glass btn-sm"
           style="padding: 7px 9px; font-size: 12.5px; border-radius: 9px; flex-shrink: 0;" onclick="toggleFullscreen()"
           title="Full Screen">
@@ -3015,20 +3005,48 @@
       <!-- Ticket Metadata Summary -->
       <div
         style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-glass); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
           <div style="font-size: 14px; font-weight: 700; color: #ffffff;" id="admin-reply-ticket-subject">Subject</div>
-          <span id="admin-reply-ticket-status-badge" class="badge badge-warning">OPEN</span>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span id="admin-reply-ticket-priority-badge" class="badge">NORMAL</span>
+            <span id="admin-reply-ticket-status-badge" class="badge badge-warning">OPEN</span>
+          </div>
         </div>
-        <div style="font-size: 12px; color: var(--text-dim); margin-bottom: 8px;">
-          From: <strong id="admin-reply-ticket-store" style="color: var(--cyan);">Store Name</strong> &bull;
-          Owner: <span id="admin-reply-ticket-owner">Owner</span> &bull;
-          Email: <span id="admin-reply-ticket-email" style="font-family: var(--font-mono);">email</span>
+        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap;">
+          <span id="admin-reply-ticket-category-badge" class="badge badge-cyan" style="font-size: 11px;">Technical Issue</span>
+          <span style="font-size: 12px; color: var(--text-dim);">
+            Store: <strong id="admin-reply-ticket-store" style="color: var(--cyan);">Store Name</strong> &bull;
+            Owner: <span id="admin-reply-ticket-owner">Owner</span>
+          </span>
+        </div>
+        <div style="font-size: 12px; color: var(--text-dim); margin-bottom: 8px; display: flex; gap: 14px; flex-wrap: wrap;">
+          <span>📧 Email: <a id="admin-reply-ticket-email-link" href="#" style="color: #38bdf8; text-decoration: none; font-family: var(--font-mono);"><span id="admin-reply-ticket-email">email</span></a></span>
+          <span>📞 Phone: <a id="admin-reply-ticket-phone-link" href="#" style="color: #10b981; text-decoration: none; font-weight: 700;"><span id="admin-reply-ticket-phone">N/A</span></a></span>
         </div>
         <div
           style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">
-          Merchant Inquiry:</div>
+          Customer Inquiry:</div>
         <div id="admin-reply-ticket-message"
-          style="font-size: 13px; color: #cbd5e1; line-height: 1.5; white-space: pre-wrap; background: rgba(0,0,0,0.25); padding: 10px; border-radius: 6px;">
+          style="font-size: 13px; color: #cbd5e1; line-height: 1.5; white-space: pre-wrap; background: rgba(0,0,0,0.25); padding: 10px; border-radius: 6px; margin-bottom: 10px;">
+        </div>
+
+        <!-- Attachment Inspection Card -->
+        <div id="admin-reply-ticket-att-box" style="display: none; background: rgba(6, 182, 212, 0.08); border: 1px dashed rgba(6, 182, 212, 0.35); border-radius: 8px; padding: 10px 14px;">
+          <div style="font-size: 11px; font-weight: 700; color: var(--cyan); text-transform: uppercase; margin-bottom: 6px;">
+            📎 Attached File / Screenshot:
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+              <span style="font-size: 18px;">📄</span>
+              <span id="admin-reply-ticket-att-name" style="font-size: 12.5px; color: #ffffff; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">file.png</span>
+            </div>
+            <a id="admin-reply-ticket-att-btn" href="#" target="_blank" download class="btn btn-sm btn-cyan" style="font-size: 11.5px; padding: 3px 10px; flex-shrink: 0;">
+              ⬇️ View / Download
+            </a>
+          </div>
+          <div id="admin-reply-ticket-img-preview-box" style="margin-top: 8px; display: none;">
+            <img id="admin-reply-ticket-img-preview" src="" alt="Attachment" style="max-height: 160px; max-width: 100%; border-radius: 6px; border: 1px solid var(--border-glass); object-fit: contain;">
+          </div>
         </div>
       </div>
 
@@ -3897,29 +3915,32 @@
   <!-- ========================================================================= -->
   <div id="modal-public-support" class="modal-backdrop">
     <div class="modal-card glass-panel"
-      style="max-width: 520px; border-color: rgba(16, 185, 129, 0.45); padding: 24px;">
+      style="max-width: 560px; border-color: rgba(16, 185, 129, 0.45); padding: 24px; max-height: 90vh; overflow-y: auto;">
       <div
         style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--border-glass); padding-bottom: 12px;">
         <div style="display: flex; align-items: center; gap: 10px;">
           <span style="font-size: 26px;">🎧</span>
           <div>
             <h3 style="font-size: 18px; font-weight: 800; color: #ffffff; margin: 0;">Need Help? / Support Ticket</h3>
-            <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">Submit an inquiry to PrasaTek
-              Technical Support</div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">Submit an inquiry to PrasaTek Technical Support</div>
           </div>
         </div>
         <button class="btn btn-sm btn-glass" onclick="closePublicSupportModal()">✕</button>
       </div>
 
       <form id="form-public-support" onsubmit="handlePublicSupportSubmit(event)" autocomplete="off">
-        <div class="form-group">
-          <label class="form-label" style="font-size: 12.5px; font-weight: 700;">
-            Registered Email Address <span style="color: var(--emerald);">* (Mandatory)</span>
-          </label>
-          <input type="email" id="public-ticket-email" class="form-control" placeholder="e.g. owner@yourbusiness.lk"
-            required>
-          <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">
-            Our support engineers will email replies directly to this registered address.
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label" style="font-size: 12px; font-weight: 700;">
+              Registered Email <span style="color: var(--emerald);">* (Mandatory)</span>
+            </label>
+            <input type="email" id="public-ticket-email" class="form-control" placeholder="e.g. owner@yourbusiness.lk" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="font-size: 12px; font-weight: 700;">
+              Phone Number <span style="color: var(--emerald);">* (Mandatory)</span>
+            </label>
+            <input type="tel" id="public-ticket-phone" class="form-control" placeholder="e.g. +94 77 123 4567" required>
           </div>
         </div>
 
@@ -3935,21 +3956,58 @@
           </div>
         </div>
 
-        <div class="form-group">
-          <label class="form-label" style="font-size: 12.5px; font-weight: 700;">
-            Subject <span style="color: var(--emerald);">*</span>
-          </label>
-          <input type="text" id="public-ticket-subject" class="form-control"
-            placeholder="e.g. Forgot Master Password / Printer Configuration" required>
+        <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label" style="font-size: 12px; font-weight: 700;">Reason / Category</label>
+            <select id="public-ticket-category" class="form-control" style="font-size: 12.5px;">
+              <option value="Technical Issue" selected>🛠️ Technical Issue</option>
+              <option value="Billing &amp; Account">💳 Billing &amp; Account</option>
+              <option value="Hardware &amp; Scanner">🖨️ Hardware / Barcode Scanner</option>
+              <option value="Software Bug">🐛 Software Bug / Glitch</option>
+              <option value="Feature Request">💡 Feature Request</option>
+              <option value="General Inquiry">ℹ️ General Inquiry</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="font-size: 12px; font-weight: 700;">Priority Level</label>
+            <select id="public-ticket-priority" class="form-control" style="font-size: 12.5px;">
+              <option value="Normal" selected>🟢 Normal</option>
+              <option value="Urgent">🟠 Urgent (High Impact)</option>
+              <option value="Critical">🔴 Critical (Register Blocked)</option>
+            </select>
+          </div>
         </div>
 
         <div class="form-group">
-          <label class="form-label" style="font-size: 12.5px; font-weight: 700;">
+          <label class="form-label" style="font-size: 12px; font-weight: 700;">
+            Subject <span style="color: var(--emerald);">*</span>
+          </label>
+          <input type="text" id="public-ticket-subject" class="form-control"
+            placeholder="e.g. Forgot Master Password / Printer Configuration Issue" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" style="font-size: 12px; font-weight: 700;">
             Message / Details <span style="color: var(--emerald);">*</span>
           </label>
           <textarea id="public-ticket-message" class="form-control" rows="4"
             placeholder="Please describe your question or issue in detail..." required
             style="resize: vertical;"></textarea>
+        </div>
+
+        <!-- File / Screenshot Attachment -->
+        <div class="form-group" style="background: rgba(255, 255, 255, 0.03); border: 1px dashed var(--border-glass); border-radius: 8px; padding: 10px 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <label class="form-label" style="font-size: 12px; font-weight: 700; margin: 0;">
+              📎 Screenshot / Document Attachment (Optional)
+            </label>
+            <button type="button" id="btn-clear-public-file" class="btn btn-sm btn-glass" onclick="clearPublicTicketFile()" style="display: none; padding: 2px 8px; font-size: 11px;">✕ Remove</button>
+          </div>
+          <input type="file" id="public-ticket-file" class="form-control" accept="image/*,.pdf,.doc,.docx,.txt" onchange="handlePublicTicketFileSelect(this)" style="font-size: 12px;">
+          <div id="public-ticket-file-name" style="font-size: 11.5px; color: var(--cyan); margin-top: 4px; display: none;"></div>
+          <div id="public-ticket-file-thumb-box" style="margin-top: 6px; display: none;">
+            <img id="public-ticket-file-thumb" src="" alt="Preview" style="max-height: 80px; border-radius: 6px; border: 1px solid var(--border-glass);">
+          </div>
         </div>
 
         <div style="display: flex; gap: 10px; margin-top: 18px;">
@@ -3970,7 +4028,7 @@
   <!-- ========================================================================= -->
   <div id="modal-pos-ticket" class="modal-backdrop">
     <div class="modal-card glass-panel"
-      style="max-width: 540px; border-color: rgba(16, 185, 129, 0.45); padding: 24px;">
+      style="max-width: 560px; border-color: rgba(16, 185, 129, 0.45); padding: 24px; max-height: 90vh; overflow-y: auto;">
       <div
         style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--border-glass); padding-bottom: 12px;">
         <div style="display: flex; align-items: center; gap: 10px;">
@@ -3987,21 +4045,73 @@
       </div>
 
       <form id="form-pos-modal-ticket" onsubmit="handlePosModalTicketSubmit(event)" autocomplete="off">
-        <div class="form-group">
-          <label class="form-label" style="font-size: 12.5px; font-weight: 700;">
-            Subject <span style="color: var(--emerald);">*</span>
-          </label>
-          <input type="text" id="pos-modal-ticket-subject" class="form-control"
-            placeholder="e.g. Need assistance with barcode label printing" required>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label" style="font-size: 12px; font-weight: 700;">
+              Registered Email <span style="color: var(--emerald);">*</span>
+            </label>
+            <input type="email" id="pos-ticket-email" class="form-control" required placeholder="owner@business.lk">
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="font-size: 12px; font-weight: 700;">
+              Phone Number <span style="color: var(--emerald);">*</span>
+            </label>
+            <input type="tel" id="pos-ticket-phone" class="form-control" required placeholder="+94 77 123 4567">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label" style="font-size: 12px; font-weight: 700;">Reason / Category</label>
+            <select id="pos-ticket-category" class="form-control" style="font-size: 12.5px;">
+              <option value="Technical Issue" selected>🛠️ Technical Issue</option>
+              <option value="Billing &amp; Account">💳 Billing &amp; Account</option>
+              <option value="Hardware &amp; Scanner">🖨️ Hardware / Barcode Scanner</option>
+              <option value="Software Bug">🐛 Software Bug / Glitch</option>
+              <option value="Feature Request">💡 Feature Request</option>
+              <option value="General Inquiry">ℹ️ General Inquiry</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="font-size: 12px; font-weight: 700;">Priority Level</label>
+            <select id="pos-ticket-priority" class="form-control" style="font-size: 12.5px;">
+              <option value="Normal" selected>🟢 Normal</option>
+              <option value="Urgent">🟠 Urgent (High Impact)</option>
+              <option value="Critical">🔴 Critical (Register Blocked)</option>
+            </select>
+          </div>
         </div>
 
         <div class="form-group">
-          <label class="form-label" style="font-size: 12.5px; font-weight: 700;">
+          <label class="form-label" style="font-size: 12px; font-weight: 700;">
+            Subject <span style="color: var(--emerald);">*</span>
+          </label>
+          <input type="text" id="pos-modal-ticket-subject" class="form-control"
+            placeholder="e.g. Need assistance with barcode scanner carriage return" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" style="font-size: 12px; font-weight: 700;">
             Message / Details <span style="color: var(--emerald);">*</span>
           </label>
-          <textarea id="pos-modal-ticket-message" class="form-control" rows="5"
+          <textarea id="pos-modal-ticket-message" class="form-control" rows="4"
             placeholder="Describe the issue, station number, or guidance needed..." required
             style="resize: vertical;"></textarea>
+        </div>
+
+        <!-- File / Screenshot Attachment -->
+        <div class="form-group" style="background: rgba(255, 255, 255, 0.03); border: 1px dashed var(--border-glass); border-radius: 8px; padding: 10px 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <label class="form-label" style="font-size: 12px; font-weight: 700; margin: 0;">
+              📎 Screenshot / Document Attachment (Optional)
+            </label>
+            <button type="button" id="btn-clear-pos-file" class="btn btn-sm btn-glass" onclick="clearPosTicketFile()" style="display: none; padding: 2px 8px; font-size: 11px;">✕ Remove</button>
+          </div>
+          <input type="file" id="pos-ticket-file" class="form-control" accept="image/*,.pdf,.doc,.docx,.txt" onchange="handlePosTicketFileSelect(this)" style="font-size: 12px;">
+          <div id="pos-ticket-file-name" style="font-size: 11.5px; color: var(--cyan); margin-top: 4px; display: none;"></div>
+          <div id="pos-ticket-file-thumb-box" style="margin-top: 6px; display: none;">
+            <img id="pos-ticket-file-thumb" src="" alt="Preview" style="max-height: 80px; border-radius: 6px; border: 1px solid var(--border-glass);">
+          </div>
         </div>
 
         <div style="display: flex; gap: 10px; margin-top: 18px;">

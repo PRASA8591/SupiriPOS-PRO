@@ -309,8 +309,13 @@ class SupportTicket(Base):
     business_name = Column(String(150), nullable=True)
     owner_email = Column(String(150), nullable=True)
     owner_name = Column(String(150), nullable=True)
+    phone = Column(String(50), nullable=True)
+    category = Column(String(50), default="Technical Issue", index=True)
+    priority = Column(String(30), default="Normal", index=True)
     subject = Column(String(250), nullable=False)
     message = Column(Text, nullable=False)
+    attachment_name = Column(String(255), nullable=True)
+    attachment_data = Column(Text, nullable=True)
     status = Column(String(30), default="open", index=True)  # open, resolved
     admin_reply = Column(Text, nullable=True)
     replied_at = Column(DateTime, nullable=True)
@@ -322,7 +327,7 @@ try:
     Base.metadata.create_all(bind=engine)
     logger.info("[DB] All database tables verified / created successfully.")
     
-    # Safe column migration check for pos_users and businesses
+    # Safe column migration check for pos_users, businesses, and support_tickets
     with engine.connect() as conn:
         try:
             if engine.dialect.name == "sqlite":
@@ -337,9 +342,28 @@ try:
                 if "is_active" not in b_cols:
                     conn.execute(text("ALTER TABLE businesses ADD COLUMN is_active BOOLEAN DEFAULT 1"))
                     conn.commit()
+
+                s_res = conn.execute(text("PRAGMA table_info(support_tickets)")).fetchall()
+                s_cols = [r[1] for r in s_res]
+                if "phone" not in s_cols:
+                    conn.execute(text("ALTER TABLE support_tickets ADD COLUMN phone VARCHAR(50)"))
+                if "category" not in s_cols:
+                    conn.execute(text("ALTER TABLE support_tickets ADD COLUMN category VARCHAR(50) DEFAULT 'Technical Issue'"))
+                if "priority" not in s_cols:
+                    conn.execute(text("ALTER TABLE support_tickets ADD COLUMN priority VARCHAR(30) DEFAULT 'Normal'"))
+                if "attachment_name" not in s_cols:
+                    conn.execute(text("ALTER TABLE support_tickets ADD COLUMN attachment_name VARCHAR(255)"))
+                if "attachment_data" not in s_cols:
+                    conn.execute(text("ALTER TABLE support_tickets ADD COLUMN attachment_data TEXT"))
+                conn.commit()
             else:
                 conn.execute(text("ALTER TABLE pos_users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT FALSE"))
                 conn.execute(text("ALTER TABLE businesses ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE"))
+                conn.execute(text("ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS phone VARCHAR(50)"))
+                conn.execute(text("ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT 'Technical Issue'"))
+                conn.execute(text("ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS priority VARCHAR(30) DEFAULT 'Normal'"))
+                conn.execute(text("ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS attachment_name VARCHAR(255)"))
+                conn.execute(text("ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS attachment_data TEXT"))
                 conn.commit()
         except Exception as mig_err:
             logger.info(f"[DB] Migration check: {mig_err}")
@@ -931,9 +955,14 @@ class BusinessDeleteRequest(BaseModel):
 class SupportTicketCreateRequest(BaseModel):
     business_code: Optional[str] = None
     email: Optional[str] = None
+    phone: Optional[str] = None
     name: Optional[str] = None
+    category: Optional[str] = "Technical Issue"
+    priority: Optional[str] = "Normal"
     subject: str
     message: str
+    attachment_name: Optional[str] = None
+    attachment_data: Optional[str] = None
 
 class AdminTicketReplyRequest(BaseModel):
     reply_message: Optional[str] = None
@@ -3483,10 +3512,14 @@ def business_delete_with_otp(req: BusinessDeleteRequest, db: Session = Depends(g
 @app.post("/api/support/tickets")
 def create_support_ticket(req: SupportTicketCreateRequest, db: Session = Depends(get_db)):
     """
-    Submits a new support inquiry / ticket.
-    Can be submitted by:
-    1. Logged-in POS user (providing business_code)
-    2. Public Landing page user (providing mandatory registered email address)
+    Submits an advanced support inquiry / ticket.
+    Requires:
+    - Registered Email (Mandatory)
+    - Phone Number (Mandatory)
+    - Subject (Mandatory)
+    - Message (Mandatory)
+    - Reason / Category & Priority (Dropdown selections)
+    - Optional: Business Code & File/Image Attachment (Base64 data URL)
     """
     subject_clean = req.subject.strip()
     msg_clean = req.message.strip()
@@ -3494,17 +3527,19 @@ def create_support_ticket(req: SupportTicketCreateRequest, db: Session = Depends
     if not subject_clean or not msg_clean:
         raise HTTPException(status_code=400, detail="Subject and message are required.")
 
-    code_clean = req.business_code.strip().upper() if (req.business_code and req.business_code.strip()) else None
     email_clean = req.email.strip().lower() if (req.email and req.email.strip()) else None
+    if not email_clean or "@" not in email_clean or "." not in email_clean:
+        raise HTTPException(status_code=400, detail="A valid registered email address is required.")
 
-    if not code_clean and not email_clean:
-        raise HTTPException(
-            status_code=400,
-            detail="Registered Email Address or Business Code is required to submit a support ticket."
-        )
+    phone_clean = req.phone.strip() if (req.phone and req.phone.strip()) else None
+    if not phone_clean:
+        raise HTTPException(status_code=400, detail="Phone number is required for support verification.")
 
-    if email_clean and ("@" not in email_clean or "." not in email_clean):
-        raise HTTPException(status_code=400, detail="Please enter a valid email address.")
+    code_clean = req.business_code.strip().upper() if (req.business_code and req.business_code.strip()) else None
+    category_val = (req.category or "Technical Issue").strip()
+    priority_val = (req.priority or "Normal").strip()
+    att_name = req.attachment_name.strip() if (req.attachment_name and req.attachment_name.strip()) else None
+    att_data = req.attachment_data if (req.attachment_data and req.attachment_data.strip()) else None
 
     biz = None
     if code_clean:
@@ -3532,8 +3567,13 @@ def create_support_ticket(req: SupportTicketCreateRequest, db: Session = Depends
         business_name=biz_name_val,
         owner_email=owner_email_val,
         owner_name=owner_name_val,
+        phone=phone_clean,
+        category=category_val,
+        priority=priority_val,
         subject=subject_clean,
         message=msg_clean,
+        attachment_name=att_name,
+        attachment_data=att_data,
         status="open"
     )
     db.add(ticket)
@@ -3541,11 +3581,12 @@ def create_support_ticket(req: SupportTicketCreateRequest, db: Session = Depends
     db.refresh(ticket)
 
     if biz_code_val and biz_code_val != "PUBLIC":
-        log_activity(db, biz_code_val, owner_name_val, "SUPPORT_TICKET_CREATED", f"Support ticket #{ticket.id} created: '{subject_clean}'")
+        log_activity(db, biz_code_val, owner_name_val, "SUPPORT_TICKET_CREATED", f"Support ticket #{ticket.id} [{priority_val}] created: '{subject_clean}'")
 
     # Send confirmation email to user via Resend API
     if owner_email_val:
-        confirm_subj = f"SupiriPOS Support Ticket Created: #{ticket.id} - {ticket.subject}"
+        confirm_subj = f"[{priority_val.upper()}] Support Ticket Created: #{ticket.id} - {ticket.subject}"
+        att_badge = f'<div style="margin-top: 8px; font-size: 12px; color: #38bdf8;">📎 Attachment included: {att_name}</div>' if att_name else ''
         confirm_html = f"""
         <!DOCTYPE html>
         <html><head><meta charset="utf-8"></head>
@@ -3553,12 +3594,25 @@ def create_support_ticket(req: SupportTicketCreateRequest, db: Session = Depends
             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 540px; margin: 0 auto; background-color: #0f172a; border-radius: 14px; border: 1px solid #1e293b; padding: 28px;">
                 <tr><td>
                     <div style="font-size: 20px; font-weight: 800; color: #10b981; margin-bottom: 6px;">SupiriPOS <span style="color: #38bdf8;">PRO</span> Support</div>
-                    <div style="font-size: 13px; color: #94a3b8; margin-bottom: 20px;">We received your support ticket <strong>#{ticket.id}</strong></div>
+                    <div style="font-size: 13px; color: #94a3b8; margin-bottom: 16px;">We received your support ticket <strong>#{ticket.id}</strong></div>
+                    
+                    <div style="display: flex; gap: 8px; margin-bottom: 14px;">
+                        <span style="background: rgba(6, 182, 212, 0.15); border: 1px solid #06b6d4; color: #06b6d4; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px;">{category_val}</span>
+                        <span style="background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; color: #ef4444; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px;">Priority: {priority_val}</span>
+                    </div>
+
                     <div style="background: rgba(16, 185, 129, 0.08); border-left: 3px solid #10b981; padding: 14px; border-radius: 6px; margin-bottom: 20px;">
                         <div style="font-size: 12px; font-weight: 700; color: #10b981; margin-bottom: 4px;">Subject: {ticket.subject}</div>
                         <div style="font-size: 13px; color: #cbd5e1; white-space: pre-wrap;">{ticket.message}</div>
+                        {att_badge}
                     </div>
-                    <p style="font-size: 13px; color: #94a3b8; line-height: 1.5;">Our support and engineering team has been notified. You will receive an official response right here in this email thread once an agent reviews your ticket.</p>
+
+                    <div style="font-size: 12px; color: #94a3b8; margin-bottom: 14px;">
+                        Phone on file: <strong>{phone_clean}</strong><br>
+                        Business: <strong>{biz_name_val} ({biz_code_val})</strong>
+                    </div>
+
+                    <p style="font-size: 13px; color: #94a3b8; line-height: 1.5;">Our engineering team has been notified. You will receive an official response right here in this email thread once an agent reviews your inquiry.</p>
                     <div style="border-top: 1px solid #1e293b; padding-top: 16px; margin-top: 24px; text-align: center; font-size: 11px; color: #64748b;">PrasaTek System Solutions &bull; Sri Lanka</div>
                 </td></tr>
             </table>
@@ -3568,21 +3622,26 @@ def create_support_ticket(req: SupportTicketCreateRequest, db: Session = Depends
             to_email=owner_email_val,
             subject=confirm_subj,
             html_content=confirm_html,
-            plain_text=f"Your ticket #{ticket.id} ({ticket.subject}) has been received. Our team will review and reply shortly.",
+            plain_text=f"Your ticket #{ticket.id} [{priority_val}] ({ticket.subject}) has been received. Our team will review and reply shortly.",
             context_label="TICKET-CONFIRM"
         )
 
     return {
         "success": True,
-        "message": f"Support ticket #{ticket.id} submitted successfully! A confirmation has been sent to {owner_email_val or 'your email'}.",
+        "message": f"Support ticket #{ticket.id} submitted successfully! A confirmation has been sent to {owner_email_val}.",
         "ticket": {
             "id": ticket.id,
             "business_code": ticket.business_code,
             "business_name": ticket.business_name,
             "owner_email": ticket.owner_email,
             "owner_name": ticket.owner_name,
+            "phone": ticket.phone,
+            "category": ticket.category,
+            "priority": ticket.priority,
             "subject": ticket.subject,
             "message": ticket.message,
+            "attachment_name": ticket.attachment_name,
+            "has_attachment": bool(ticket.attachment_data),
             "status": ticket.status,
             "created_at": ticket.created_at.isoformat() if ticket.created_at else datetime.now(timezone.utc).isoformat()
         }
@@ -3614,8 +3673,13 @@ def list_merchant_support_tickets(
             "business_code": t.business_code,
             "business_name": t.business_name,
             "owner_email": t.owner_email,
+            "phone": t.phone,
+            "category": t.category,
+            "priority": t.priority,
             "subject": t.subject,
             "message": t.message,
+            "attachment_name": t.attachment_name,
+            "attachment_data": t.attachment_data,
             "status": t.status,
             "admin_reply": t.admin_reply,
             "replied_at": t.replied_at.isoformat() if t.replied_at else None,
@@ -3626,7 +3690,7 @@ def list_merchant_support_tickets(
 
 @app.get("/api/admin/support/tickets")
 def admin_list_support_tickets(admin: SystemAdmin = Depends(get_current_admin), db: Session = Depends(get_db)):
-    """Master Admin endpoint: lists all tickets from all businesses"""
+    """Master Admin endpoint: lists all tickets with metadata and attachments from all businesses"""
     tickets = db.query(SupportTicket).order_by(desc(SupportTicket.created_at)).all()
     result = []
     open_count = 0
@@ -3640,8 +3704,13 @@ def admin_list_support_tickets(admin: SystemAdmin = Depends(get_current_admin), 
             "business_name": t.business_name or t.business_code,
             "owner_email": t.owner_email,
             "owner_name": t.owner_name,
+            "phone": t.phone,
+            "category": t.category or "Technical Issue",
+            "priority": t.priority or "Normal",
             "subject": t.subject,
             "message": t.message,
+            "attachment_name": t.attachment_name,
+            "attachment_data": t.attachment_data,
             "status": t.status,
             "admin_reply": t.admin_reply,
             "replied_at": t.replied_at.isoformat() if t.replied_at else None,

@@ -424,6 +424,8 @@ function switchBusinessTerminal() {
   AppState.business = null;
   AppState.user = null;
   AppState.prefilledCredentials = false;
+  sessionStorage.removeItem('supiripos_biz_session');
+  sessionStorage.removeItem('supiripos_user_session');
   localStorage.removeItem('supiripos_biz_session');
   localStorage.removeItem('supiripos_user_session');
   if (AppState.socket) {
@@ -446,7 +448,8 @@ function logoutStaffUser() {
   }
   AppState.user = null;
   AppState.prefilledCredentials = false;
-  localStorage.removeItem('supiripos_user_session');
+  // Tab-isolated session cleanup: only removes this tab's shift session
+  sessionStorage.removeItem('supiripos_user_session');
   const uInput = document.getElementById('pos-login-username');
   const pInput = document.getElementById('pos-login-password');
   if (uInput) uInput.value = '';
@@ -486,9 +489,10 @@ async function launchInstantDemo() {
 
     AppState.user = loginData.user;
 
-    // Save to localStorage
+    // Save to tab-isolated sessionStorage and persistent localStorage
+    sessionStorage.setItem('supiripos_biz_session', JSON.stringify(AppState.business));
+    sessionStorage.setItem('supiripos_user_session', JSON.stringify(AppState.user));
     localStorage.setItem('supiripos_biz_session', JSON.stringify(AppState.business));
-    localStorage.setItem('supiripos_user_session', JSON.stringify(AppState.user));
     showToast("🎉 Welcome to Supiri Mart Supermarket (PT-DEMO)!", "success", 3000);
     enterWorkspace();
   } catch (err) {
@@ -816,10 +820,10 @@ async function handleUnlockBiz(e) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || 'Terminal unlock failed');
 
-    // Stealth Master Admin Interception
+    // Stealth Master Admin Interception (tab-isolated)
     if (data.role === 'super_admin') {
-      localStorage.setItem('supiripos_admin_token', data.token);
-      localStorage.setItem('supiripos_admin_email', data.admin_email);
+      sessionStorage.setItem('supiripos_admin_token', data.token);
+      sessionStorage.setItem('supiripos_admin_email', data.admin_email);
       closeUnlockBizModal();
       showToast("👑 Master Control Panel Activated", "success", 2500);
       openMasterAdminPanel();
@@ -827,6 +831,7 @@ async function handleUnlockBiz(e) {
     }
 
     AppState.business = data.business;
+    sessionStorage.setItem('supiripos_biz_session', JSON.stringify(AppState.business));
     localStorage.setItem('supiripos_biz_session', JSON.stringify(AppState.business));
 
     closeUnlockBizModal();
@@ -893,10 +898,10 @@ async function handlePOSLogin(e) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || 'Invalid staff credentials');
 
-    // Stealth Master Admin Interception
+    // Stealth Master Admin Interception (tab-isolated)
     if (data.role === 'super_admin') {
-      localStorage.setItem('supiripos_admin_token', data.token);
-      localStorage.setItem('supiripos_admin_email', data.admin_email);
+      sessionStorage.setItem('supiripos_admin_token', data.token);
+      sessionStorage.setItem('supiripos_admin_email', data.admin_email);
       showToast("👑 Master Control Panel Activated", "success", 2500);
       openMasterAdminPanel();
       return;
@@ -910,7 +915,8 @@ async function handlePOSLogin(e) {
     }
 
     AppState.user = data.user;
-    localStorage.setItem('supiripos_user_session', JSON.stringify(AppState.user));
+    // Tab-isolated cashier shift
+    sessionStorage.setItem('supiripos_user_session', JSON.stringify(AppState.user));
     showToast(`Welcome, ${data.user.full_name}! Shift opened.`, "success");
     enterWorkspace();
   } catch (err) {
@@ -969,7 +975,7 @@ async function handleSecureAdminSubmit(e) {
     document.getElementById('modal-secure-admin').classList.remove('active');
     AppState.user = data.user;
     AppState.pendingAdminUser = null;
-    localStorage.setItem('supiripos_user_session', JSON.stringify(AppState.user));
+    sessionStorage.setItem('supiripos_user_session', JSON.stringify(AppState.user));
     showToast("🔐 Admin credentials secured! Opening POS workspace...", "success", 3500);
     enterWorkspace();
   } catch (err) {
@@ -4463,7 +4469,7 @@ const AdminState = {
 };
 
 function getAdminToken() {
-  return localStorage.getItem('supiripos_admin_token') || '';
+  return sessionStorage.getItem('supiripos_admin_token') || localStorage.getItem('supiripos_admin_token') || '';
 }
 
 function getAdminAuthHeaders() {
@@ -4486,7 +4492,7 @@ function escapeAdminHtml(text) {
 }
 
 async function openMasterAdminPanel() {
-  const email = localStorage.getItem('supiripos_admin_email') || 'admin@prasatek.lk';
+  const email = sessionStorage.getItem('supiripos_admin_email') || localStorage.getItem('supiripos_admin_email') || 'admin@prasatek.lk';
   const emailEl = document.getElementById('master-admin-email-display');
   if (emailEl) emailEl.textContent = email;
 
@@ -5043,7 +5049,7 @@ async function confirmDeleteBusiness(id, name) {
 // MASTER ADMIN: Super Admin Profile & Credentials Settings
 // ---------------------------------------------------------------------------
 function openAdminCredentialsModal() {
-  const currEmail = localStorage.getItem('supiripos_admin_email') || 'admin@prasatek.lk';
+  const currEmail = sessionStorage.getItem('supiripos_admin_email') || localStorage.getItem('supiripos_admin_email') || 'admin@prasatek.lk';
   const emailInput = document.getElementById('admin-set-new-email');
   if (emailInput) emailInput.value = currEmail;
 
@@ -5105,10 +5111,10 @@ async function handleAdminProfileUpdate(e) {
     if (!res.ok) throw new Error(data.detail || "Failed to update admin profile");
 
     if (data.token) {
-      localStorage.setItem('supiripos_admin_token', data.token);
+      sessionStorage.setItem('supiripos_admin_token', data.token);
     }
     if (data.admin_email) {
-      localStorage.setItem('supiripos_admin_email', data.admin_email);
+      sessionStorage.setItem('supiripos_admin_email', data.admin_email);
       const emailEl = document.getElementById('master-admin-email-display');
       if (emailEl) emailEl.textContent = data.admin_email;
     }
@@ -5129,6 +5135,8 @@ async function handleAdminProfileUpdate(e) {
 // MASTER ADMIN: Logout
 // ---------------------------------------------------------------------------
 function logoutMasterAdmin() {
+  sessionStorage.removeItem('supiripos_admin_token');
+  sessionStorage.removeItem('supiripos_admin_email');
   localStorage.removeItem('supiripos_admin_token');
   localStorage.removeItem('supiripos_admin_email');
   showToast("Master Admin session ended.", "info", 2000);
@@ -5372,6 +5380,7 @@ async function handleBizOtpSubmit(e) {
 
       if (data.business) {
         AppState.business = Object.assign({}, AppState.business, data.business);
+        sessionStorage.setItem('supiripos_biz_session', JSON.stringify(AppState.business));
         localStorage.setItem('supiripos_biz_session', JSON.stringify(AppState.business));
 
         const shopNameEl = document.getElementById('ws-shop-name');
@@ -5654,35 +5663,67 @@ function renderAdminSupportTicketsTable(list) {
   list.forEach(t => {
     const isResolved = (t.status === 'resolved');
     const dateStr = t.created_at ? t.created_at.replace('T', ' ').substring(0, 16) : '—';
+    const prio = (t.priority || 'Normal').toUpperCase();
+    let prioBadge = '<span class="badge" style="background: rgba(6,182,212,0.15); color: #06b6d4; border: 1px solid rgba(6,182,212,0.3); font-size: 10px; padding: 2px 6px;">NORMAL</span>';
+    if (prio === 'CRITICAL') {
+      prioBadge = '<span class="badge" style="background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.4); font-size: 10px; padding: 2px 6px; font-weight: 700;">🚨 CRITICAL</span>';
+    } else if (prio === 'URGENT') {
+      prioBadge = '<span class="badge" style="background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.4); font-size: 10px; padding: 2px 6px; font-weight: 700;">⚠️ URGENT</span>';
+    }
+
+    const catName = t.category || 'Technical Issue';
+    const hasAtt = !!(t.attachment_name);
 
     html += `
       <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); transition: background 0.15s ease;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
-        <!-- Ticket # -->
-        <td style="padding: 14px 16px; font-family: var(--font-mono); font-weight: 700; color: var(--cyan);">
-          #${t.id}
+        <!-- Ticket # & Priority -->
+        <td style="padding: 14px 16px;">
+          <div style="font-family: var(--font-mono); font-weight: 700; color: var(--cyan); font-size: 13px;">#${t.id}</div>
+          <div style="margin-top: 4px;">${prioBadge}</div>
         </td>
 
         <!-- Store & Location -->
         <td style="padding: 14px 16px;">
           <div style="font-weight: 700; color: #ffffff;">${escapeAdminHtml(t.business_name || 'Store')}</div>
-          <div style="font-size: 11px; color: var(--cyan); font-family: var(--font-mono); margin-top: 2px;">${escapeAdminHtml(t.business_code)}</div>
+          <div style="font-size: 11px; color: var(--cyan); font-family: var(--font-mono); margin-top: 2px;">${escapeAdminHtml(t.business_code || '—')}</div>
         </td>
 
-        <!-- Owner & Email -->
+        <!-- Contact (Email & Phone) -->
         <td style="padding: 14px 16px;">
           <div style="font-weight: 600; color: #f1f5f9; font-size: 13px;">${escapeAdminHtml(t.owner_name || '—')}</div>
-          <div style="font-size: 11px; color: var(--text-dim); margin-top: 2px; font-family: var(--font-mono);">${escapeAdminHtml(t.owner_email || '—')}</div>
+          <div style="margin-top: 3px;">
+            <a href="mailto:${escapeAdminHtml(t.owner_email || '')}" style="font-size: 11px; color: var(--cyan); font-family: var(--font-mono); text-decoration: none;">
+              ✉️ ${escapeAdminHtml(t.owner_email || '—')}
+            </a>
+          </div>
+          ${t.phone ? `
+            <div style="margin-top: 3px;">
+              <a href="tel:${escapeAdminHtml(t.phone)}" style="font-size: 11px; color: var(--text-dim); font-family: var(--font-mono); text-decoration: none;">
+                📞 ${escapeAdminHtml(t.phone)}
+              </a>
+            </div>
+          ` : ''}
         </td>
 
-        <!-- Subject & Inquiry -->
+        <!-- Category & Inquiry -->
         <td style="padding: 14px 16px;">
-          <div style="font-weight: 700; color: #ffffff; font-size: 13.5px;">${escapeAdminHtml(t.subject)}</div>
-          <div style="font-size: 12px; color: var(--text-muted); max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 3px;" title="${escapeAdminHtml(t.message)}">
+          <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+            <span class="badge" style="background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.3); font-size: 10.5px; padding: 2px 7px;">
+              ${escapeAdminHtml(catName)}
+            </span>
+            ${hasAtt ? `
+              <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 10px; padding: 2px 6px;" title="${escapeAdminHtml(t.attachment_name)}">
+                📎 Attached
+              </span>
+            ` : ''}
+          </div>
+          <div style="font-weight: 700; color: #ffffff; font-size: 13.5px; margin-top: 5px;">${escapeAdminHtml(t.subject)}</div>
+          <div style="font-size: 12px; color: var(--text-muted); max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 3px;" title="${escapeAdminHtml(t.message)}">
             ${escapeAdminHtml(t.message)}
           </div>
           ${t.admin_reply ? `
             <div style="font-size: 11px; color: var(--emerald); margin-top: 4px;">
-              ✓ Replied: ${escapeAdminHtml(t.admin_reply.substring(0, 60))}...
+              ✓ Replied: ${escapeAdminHtml(t.admin_reply.substring(0, 50))}...
             </div>
           ` : ''}
         </td>
@@ -5717,13 +5758,77 @@ function openAdminTicketReplyModal(ticketId) {
   if (!t) return;
   AdminSupportState.currentTicket = t;
 
-  document.getElementById('admin-reply-ticket-id').value = t.id;
-  document.getElementById('admin-reply-ticket-badge').textContent = `#${t.id}`;
-  document.getElementById('admin-reply-ticket-subject').textContent = t.subject;
-  document.getElementById('admin-reply-ticket-store').textContent = t.business_name || t.business_code;
-  document.getElementById('admin-reply-ticket-owner').textContent = t.owner_name || 'Owner';
-  document.getElementById('admin-reply-ticket-email').textContent = t.owner_email || 'No email';
-  document.getElementById('admin-reply-ticket-message').textContent = t.message;
+  const idEl = document.getElementById('admin-reply-ticket-id');
+  if (idEl) idEl.value = t.id;
+  const badgeEl = document.getElementById('admin-reply-ticket-badge');
+  if (badgeEl) badgeEl.textContent = `#${t.id}`;
+  const subEl = document.getElementById('admin-reply-ticket-subject');
+  if (subEl) subEl.textContent = t.subject;
+  const storeEl = document.getElementById('admin-reply-ticket-store');
+  if (storeEl) storeEl.textContent = t.business_name || t.business_code || 'Store';
+  const ownerEl = document.getElementById('admin-reply-ticket-owner');
+  if (ownerEl) ownerEl.textContent = t.owner_name || 'Owner';
+
+  const emailEl = document.getElementById('admin-reply-ticket-email');
+  if (emailEl) emailEl.textContent = t.owner_email || 'No email';
+  const emailLink = document.getElementById('admin-reply-ticket-email-link');
+  if (emailLink) emailLink.href = t.owner_email ? `mailto:${t.owner_email}` : '#';
+
+  const phoneEl = document.getElementById('admin-reply-ticket-phone');
+  if (phoneEl) phoneEl.textContent = t.phone || 'No phone';
+  const phoneLink = document.getElementById('admin-reply-ticket-phone-link');
+  if (phoneLink) phoneLink.href = t.phone ? `tel:${t.phone}` : '#';
+
+  const catBadge = document.getElementById('admin-reply-ticket-category-badge');
+  if (catBadge) catBadge.textContent = t.category || 'General';
+
+  const prioBadge = document.getElementById('admin-reply-ticket-priority-badge');
+  if (prioBadge) {
+    const prio = (t.priority || 'Normal').toUpperCase();
+    prioBadge.textContent = prio;
+    if (prio === 'CRITICAL') {
+      prioBadge.style.background = 'rgba(239,68,68,0.2)';
+      prioBadge.style.color = '#ef4444';
+      prioBadge.style.border = '1px solid rgba(239,68,68,0.4)';
+    } else if (prio === 'URGENT') {
+      prioBadge.style.background = 'rgba(245,158,11,0.2)';
+      prioBadge.style.color = '#f59e0b';
+      prioBadge.style.border = '1px solid rgba(245,158,11,0.4)';
+    } else {
+      prioBadge.style.background = 'rgba(6,182,212,0.2)';
+      prioBadge.style.color = '#06b6d4';
+      prioBadge.style.border = '1px solid rgba(6,182,212,0.4)';
+    }
+  }
+
+  const msgEl = document.getElementById('admin-reply-ticket-message');
+  if (msgEl) msgEl.textContent = t.message;
+
+  // Attachment inspection
+  const attBox = document.getElementById('admin-reply-ticket-att-box');
+  const attName = document.getElementById('admin-reply-ticket-att-name');
+  const attBtn = document.getElementById('admin-reply-ticket-att-btn');
+  const imgBox = document.getElementById('admin-reply-ticket-img-preview-box');
+  const imgPreview = document.getElementById('admin-reply-ticket-img-preview');
+
+  if (t.attachment_name && t.attachment_data) {
+    if (attBox) attBox.style.display = 'block';
+    if (attName) attName.textContent = t.attachment_name;
+    if (attBtn) {
+      attBtn.href = t.attachment_data;
+      attBtn.download = t.attachment_name;
+      attBtn.style.display = 'inline-flex';
+    }
+    if (t.attachment_data.startsWith('data:image/') && imgBox && imgPreview) {
+      imgPreview.src = t.attachment_data;
+      imgBox.style.display = 'block';
+    } else if (imgBox) {
+      imgBox.style.display = 'none';
+    }
+  } else {
+    if (attBox) attBox.style.display = 'none';
+    if (imgBox) imgBox.style.display = 'none';
+  }
 
   const statusBadge = document.getElementById('admin-reply-ticket-status-badge');
   if (statusBadge) {
@@ -5790,6 +5895,106 @@ async function handleAdminSendTicketReply(e) {
 }
 
 // ===========================================================================
+// SECTION: ATTACHMENT HANDLERS (PUBLIC & POS MODAL)
+// ===========================================================================
+let publicTicketAttachment = { name: null, data: null };
+let posTicketAttachment = { name: null, data: null };
+
+function handlePublicTicketFileSelect(input) {
+  if (input.files && input.files[0]) {
+    const file = input.files[0];
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("File size exceeds 5MB limit. Please choose a smaller file.", "warning");
+      input.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      publicTicketAttachment.name = file.name;
+      publicTicketAttachment.data = e.target.result;
+
+      const nameEl = document.getElementById('public-ticket-file-name');
+      const clearBtn = document.getElementById('btn-clear-public-file');
+      const thumbBox = document.getElementById('public-ticket-file-thumb-box');
+      const thumbImg = document.getElementById('public-ticket-file-thumb');
+
+      if (nameEl) {
+        nameEl.textContent = `📎 ${file.name} (${Math.round(file.size / 1024)} KB)`;
+        nameEl.style.display = 'block';
+      }
+      if (clearBtn) clearBtn.style.display = 'inline-block';
+
+      if (file.type.startsWith('image/') && thumbBox && thumbImg) {
+        thumbImg.src = e.target.result;
+        thumbBox.style.display = 'block';
+      } else if (thumbBox) {
+        thumbBox.style.display = 'none';
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+function clearPublicTicketFile() {
+  publicTicketAttachment = { name: null, data: null };
+  const input = document.getElementById('public-ticket-file');
+  if (input) input.value = '';
+  const nameEl = document.getElementById('public-ticket-file-name');
+  if (nameEl) nameEl.style.display = 'none';
+  const clearBtn = document.getElementById('btn-clear-public-file');
+  if (clearBtn) clearBtn.style.display = 'none';
+  const thumbBox = document.getElementById('public-ticket-file-thumb-box');
+  if (thumbBox) thumbBox.style.display = 'none';
+}
+
+function handlePosTicketFileSelect(input) {
+  if (input.files && input.files[0]) {
+    const file = input.files[0];
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("File size exceeds 5MB limit. Please choose a smaller file.", "warning");
+      input.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      posTicketAttachment.name = file.name;
+      posTicketAttachment.data = e.target.result;
+
+      const nameEl = document.getElementById('pos-ticket-file-name');
+      const clearBtn = document.getElementById('btn-clear-pos-file');
+      const thumbBox = document.getElementById('pos-ticket-file-thumb-box');
+      const thumbImg = document.getElementById('pos-ticket-file-thumb');
+
+      if (nameEl) {
+        nameEl.textContent = `📎 ${file.name} (${Math.round(file.size / 1024)} KB)`;
+        nameEl.style.display = 'block';
+      }
+      if (clearBtn) clearBtn.style.display = 'inline-block';
+
+      if (file.type.startsWith('image/') && thumbBox && thumbImg) {
+        thumbImg.src = e.target.result;
+        thumbBox.style.display = 'block';
+      } else if (thumbBox) {
+        thumbBox.style.display = 'none';
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+function clearPosTicketFile() {
+  posTicketAttachment = { name: null, data: null };
+  const input = document.getElementById('pos-ticket-file');
+  if (input) input.value = '';
+  const nameEl = document.getElementById('pos-ticket-file-name');
+  if (nameEl) nameEl.style.display = 'none';
+  const clearBtn = document.getElementById('btn-clear-pos-file');
+  if (clearBtn) clearBtn.style.display = 'none';
+  const thumbBox = document.getElementById('pos-ticket-file-thumb-box');
+  if (thumbBox) thumbBox.style.display = 'none';
+}
+
+// ===========================================================================
 // SECTION: PUBLIC SUPPORT TICKET MODAL (LANDING & LOGIN PAGE)
 // ===========================================================================
 function openPublicSupportModal() {
@@ -5797,10 +6002,12 @@ function openPublicSupportModal() {
   if (!modal) return;
 
   const emailInput = document.getElementById('public-ticket-email');
+  const phoneInput = document.getElementById('public-ticket-phone');
   const bizCodeInput = document.getElementById('public-ticket-bizcode');
 
   if (AppState.business) {
     if (emailInput && AppState.business.email) emailInput.value = AppState.business.email;
+    if (phoneInput && AppState.business.phone) phoneInput.value = AppState.business.phone;
     if (bizCodeInput && AppState.business.business_code) bizCodeInput.value = AppState.business.business_code;
   } else {
     const unlockCode = document.getElementById('unlock-biz-code');
@@ -5820,13 +6027,16 @@ function closePublicSupportModal() {
 async function handlePublicSupportSubmit(e) {
   e.preventDefault();
   const email = document.getElementById('public-ticket-email').value.trim();
+  const phone = document.getElementById('public-ticket-phone').value.trim();
   const name = document.getElementById('public-ticket-name').value.trim();
   const business_code = document.getElementById('public-ticket-bizcode').value.trim().toUpperCase();
+  const category = (document.getElementById('public-ticket-category')?.value || 'Technical Issue').trim();
+  const priority = (document.getElementById('public-ticket-priority')?.value || 'Normal').trim();
   const subject = document.getElementById('public-ticket-subject').value.trim();
   const message = document.getElementById('public-ticket-message').value.trim();
 
-  if (!email || !subject || !message) {
-    showToast("Please enter your registered email address, subject, and message.", "warning");
+  if (!email || !phone || !subject || !message) {
+    showToast("Please provide your registered email, contact phone, subject, and message.", "warning");
     return;
   }
 
@@ -5840,7 +6050,18 @@ async function handlePublicSupportSubmit(e) {
     const res = await fetch('/api/support/tickets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, name, business_code, subject, message })
+      body: JSON.stringify({
+        email,
+        phone,
+        name,
+        business_code,
+        category,
+        priority,
+        subject,
+        message,
+        attachment_name: publicTicketAttachment.name,
+        attachment_data: publicTicketAttachment.data
+      })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Failed to submit support ticket.");
@@ -5848,6 +6069,7 @@ async function handlePublicSupportSubmit(e) {
     closePublicSupportModal();
     const form = document.getElementById('form-public-support');
     if (form) form.reset();
+    clearPublicTicketFile();
     showToast(data.message || `Support ticket #${data.ticket.id} submitted! Confirmation email sent to ${email}.`, "success", 6000);
   } catch (err) {
     showToast(err.message, "error");
@@ -5908,9 +6130,15 @@ function openPosSupportModal() {
 
   const bizNameEl = document.getElementById('pos-ticket-modal-bizname');
   const bizCodeEl = document.getElementById('pos-ticket-modal-bizcode');
+  const emailInput = document.getElementById('pos-ticket-email');
+  const phoneInput = document.getElementById('pos-ticket-phone');
 
-  if (bizNameEl && AppState.business) bizNameEl.textContent = AppState.business.name || 'Your Store';
-  if (bizCodeEl && AppState.business) bizCodeEl.textContent = AppState.business.business_code || '';
+  if (AppState.business) {
+    if (bizNameEl) bizNameEl.textContent = AppState.business.name || 'Your Store';
+    if (bizCodeEl) bizCodeEl.textContent = AppState.business.business_code || '';
+    if (emailInput && !emailInput.value) emailInput.value = AppState.business.email || '';
+    if (phoneInput && !phoneInput.value) phoneInput.value = AppState.business.phone || '';
+  }
 
   modal.classList.add('active');
 }
@@ -5927,11 +6155,15 @@ async function handlePosModalTicketSubmit(e) {
     return;
   }
 
+  const email = (document.getElementById('pos-ticket-email')?.value || AppState.business.email || '').trim();
+  const phone = (document.getElementById('pos-ticket-phone')?.value || AppState.business.phone || '').trim();
+  const category = (document.getElementById('pos-ticket-category')?.value || 'Technical Issue').trim();
+  const priority = (document.getElementById('pos-ticket-priority')?.value || 'Normal').trim();
   const subject = document.getElementById('pos-modal-ticket-subject').value.trim();
   const message = document.getElementById('pos-modal-ticket-message').value.trim();
 
-  if (!subject || !message) {
-    showToast("Subject and message are required.", "warning");
+  if (!email || !phone || !subject || !message) {
+    showToast("Registered email, phone number, subject, and message are required.", "warning");
     return;
   }
 
@@ -5946,9 +6178,16 @@ async function handlePosModalTicketSubmit(e) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        email,
+        phone,
         business_code: AppState.business.business_code,
+        name: AppState.business.owner_name || AppState.user?.full_name || 'Store Owner',
+        category,
+        priority,
         subject,
-        message
+        message,
+        attachment_name: posTicketAttachment.name,
+        attachment_data: posTicketAttachment.data
       })
     });
     const data = await res.json();
@@ -5957,7 +6196,8 @@ async function handlePosModalTicketSubmit(e) {
     closePosSupportModal();
     const form = document.getElementById('form-pos-modal-ticket');
     if (form) form.reset();
-    showToast(data.message || `Support Ticket #${data.ticket.id} created! Confirmation email sent to ${AppState.business.email || 'your email'}.`, "success", 6000);
+    clearPosTicketFile();
+    showToast(data.message || `Support Ticket #${data.ticket.id} created! Confirmation email sent to ${email}.`, "success", 6000);
 
     // Refresh tickets list if on support tab
     if (typeof loadMerchantSupportTickets === 'function') {
@@ -6098,23 +6338,26 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el) el.value = '';
   });
 
-  // Try recovering session from localStorage
+  // Try recovering session with strict multi-tab isolation
   try {
-    const savedAdminToken = localStorage.getItem('supiripos_admin_token');
+    const savedAdminToken = sessionStorage.getItem('supiripos_admin_token');
     if (savedAdminToken) {
       openMasterAdminPanel();
       return;
     }
 
-    const savedBiz = localStorage.getItem('supiripos_biz_session');
-    const savedUser = localStorage.getItem('supiripos_user_session');
+    // Tab-isolated cashier shift with persistent store terminal unlock fallback
+    const savedBiz = sessionStorage.getItem('supiripos_biz_session') || localStorage.getItem('supiripos_biz_session');
+    const savedUser = sessionStorage.getItem('supiripos_user_session');
 
     if (savedBiz && savedUser) {
       AppState.business = JSON.parse(savedBiz);
       AppState.user = JSON.parse(savedUser);
+      sessionStorage.setItem('supiripos_biz_session', savedBiz);
       enterWorkspace();
     } else if (savedBiz) {
       AppState.business = JSON.parse(savedBiz);
+      sessionStorage.setItem('supiripos_biz_session', savedBiz);
       openPOSStaffLogin();
     } else {
       showView('landing');
